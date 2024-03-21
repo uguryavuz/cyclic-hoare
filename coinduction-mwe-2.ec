@@ -280,7 +280,7 @@ smt(). smt().
 inline P.M(S).f.
 sim.
 symmetry.
-admit.
+call IH => //.
 
 (* if false *)
 sp. admit.
