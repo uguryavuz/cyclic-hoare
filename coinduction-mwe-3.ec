@@ -27,14 +27,11 @@ module type ENT = {
 
 section.
 
-declare module L <: ENT.
-declare module R <: ENT{-L}.
-
 abstract theory M.
 
 op lim : {int | 0 <= lim} as ge0_lim.
 
-module M1 = {
+module M1(L : ENT, R : ENT) = {
   var ctr : int
 
   proc run(d : dest, x : int) : int = {
@@ -53,7 +50,7 @@ module M1 = {
   }
 }.
 
-module M2 = {
+module M2(L : ENT, R : ENT) = {
   var ctr : int
 
   proc run(d : dest, x : int) : int = {
@@ -77,14 +74,18 @@ end M.
 clone M as N.
 
 
+declare module L <: ENT{-N.M1, -N.M2}.
+declare module R <: ENT{-N.M1, -N.M2, -L}.
+
+
 lemma ind :
   equiv
-  [N.M1.run ~ N.M2.run :
+  [N.M1(L,R).run ~ N.M2(L,R).run :
     ={d, x, glob L, glob R} ==>
     ={res}]
   =>
   equiv
-  [N.M1.run ~ N.M2.run :
+  [N.M1(L,R).run ~ N.M2(L,R).run :
     ={d, x, glob L, glob R} ==>
     ={res}].
 proof.
