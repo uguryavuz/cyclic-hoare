@@ -328,123 +328,167 @@ qed.
 
 
 
-abstract theory M.
 
-op lim : {int | 0 <= lim} as ge0_lim.
 
-module M1(L : ENT, R : ENT) = {
+
+
+
+module N = {
+
   var ctr : int
+  
+  proc a_loop(d : dest, x : int) : dest * int = {
+    while (d = A /\ 0 < ctr) { 
+      (d, x) <@ L.f(x);
+      ctr <- ctr - 1;
+    }
+    return (d, x);
+  }
 
-  proc run(d : dest, x : int) : int = {
-    while ((d = A \/ d = B) (*/\ 0 < ctr*) ) {
+  proc b_loop(d : dest, x : int) : dest * int = {
+    while (d = B /\ 0 < ctr) { 
+      (d, x) <@ R.f(x);
+      ctr <- ctr - 1;
+    }
+    return (d, x);
+  }
+
+  proc run1(d : dest, x : int) : int = {
+    while ((d = A \/ d = B) /\ 0 < ctr) {
       if (d = A) {
         (d, x) <@ L.f(x);
         ctr <- ctr - 1;
-      } else {
-        while (d = B (*/\ 0 < ctr*) ) {
-          (d, x) <@ R.f(x);
-          ctr <- ctr - 1;
-        }
+      }
+      else { 
+        (d, x) <@ b_loop(d, x);
       }
     }
     return x;
   }
-}.
 
-module M2(L : ENT, R : ENT) = {
-  var ctr : int
-
-  proc run(d : dest, x : int) : int = {
-    while ((d = A \/ d = B) (*/\ 0 < ctr*) ) {
-      if (d = B) {
-        (d, x) <@ R.f(x);
+  proc run2(d : dest, x : int) : int = {
+    while ((d = A \/ d = B) /\ 0 < ctr) {
+      if (d = B) { 
+        (d, x) <@ R.f(x); 
         ctr <- ctr - 1;
-      } else {
-        while (d = A (*/\ 0 < ctr*) ) {
-          (d, x) <@ L.f(x);
-          ctr <- ctr - 1;
-        }
+      } 
+      else { 
+        (d, x) <@ a_loop(d, x); 
       }
     }
     return x;
   }
+
+  proc unroll1(d : dest, x : int) : int = {
+    (d, x) <@ b_loop(d, x);
+    x <@ run1(d, x);
+    return x;
+  }
+
+  proc unroll2(d : dest, x : int) : int = {
+    (d, x) <@ a_loop(d, x);
+    x <@ run2(d, x);
+    return x;
+  }
 }.
 
-end M.
-
-clone M as N.
 
 
-declare module L <: ENT{-N.M1, -N.M2}.
-declare module R <: ENT{-N.M1, -N.M2, -L}.
-
-lemma ind :
-    eq1 /\ eq2 /\ eq3 => eq1 /\ eq2 /\ eq3.
-
-lemma ind :
-  equiv
-  [N.M1(L,R).run ~ N.M2(L,R).run :
-    ={d, x, glob L, glob R} ==>
-    ={res}]
-  =>
-  equiv
-  [N.M1(L,R).run ~ N.M2(L,R).run :
-    ={d, x, glob L, glob R} ==>
+op eq1' ctr = equiv
+  [N.run1 ~ N.run2 :
+    ={glob L, glob R, d, x, N.ctr} /\ ctr = N.ctr{1} ==>
     ={res}].
+
+op eq2' ctr = equiv
+  [N.run1 ~ N.unroll2 :
+    ={glob L, glob R, d, x, N.ctr} /\ ctr = N.ctr{1} ==>
+    ={res}].
+
+op eq3' ctr = equiv
+  [N.unroll1 ~ N.run2 :
+    ={glob L, glob R, d, x, N.ctr} /\ ctr = N.ctr{1} ==>
+    ={res}].
+
+op IH' ctr = eq1' ctr /\ eq2' ctr /\ eq3' ctr.
+
+
+
+lemma ind_ctr (ctr : int) :
+  IH' ctr.
 proof.
+case (ctr < 0) => [lt0_ctr | ge0_ctr].
 
-move => IH.
-proc.
-
-
-(* PERFORMING COMPUTATION *)
-
-case (d{1} = Env).
-rcondf{1} 1; auto.
-rcondf{2} 1; auto.
-
-(* A case *)
-case (d{1} = A).
-rcondt{1} 1 => //.
-rcondt{1} 1 => //.
-rcondt{2} 1 => //.
-rcondf{2} 1 => //.
-rcondt{2} 1 => //.
-seq 1 1 : (={d, x, glob L, glob R}).
-call (_ : true); auto.
-sp.
-
-admit.
-
-(* B case *)
-conseq (_ : ={glob L, glob R, d, x} /\ d{1} = B ==> ={x}).
-progress. smt().
-admit.
-
-(* APPLY INDUCTIVE HYPOTHESIS *)
-
-transitivity{1} {
-  x <@ N.M1.run(d,x);
-} (={d, x, glob L, glob R} ==> ={x})
-  (={d, x, glob L, glob R} ==> ={x}).
-progress. smt().
-smt().
-inline. sim.
-
-symmetry.
-transitivity{1} {
-  x <@ N.M2.run(d,x);
-} (={d, x, glob L, glob R} ==> ={x})
-  (={d, x, glob L, glob R} ==> ={x}).
-progress. smt().
-smt().
-inline. sim.
-
-symmetry.
-call IH. 
+(* Negative counter *)
+split; last split.
+move => @/eq1'. proc.
+rcondf{1} 1 => //. auto. smt().
+rcondf{2} 1 => //. auto. smt().
+move => @/eq2'. proc.
+rcondf{1} 1 => //. auto. smt().
+inline. sp.
+rcondf{2} 1 => //. auto. smt().
+sp. rcondf{2} 1 => //. auto. smt().
+sp. auto. 
+move => @/eq3'. proc.
+rcondf{2} 1 => //. auto. smt().
+inline. sp.
+rcondf{1} 1 => //. auto. smt().
+sp. rcondf{1} 1 => //. auto. smt().
 auto.
 
+(* Non-negative counter *)
+have : 0 <= ctr by smt().
+clear ge0_ctr.
+elim ctr => [| ctr get0_n IH].
+
+(* Base case *)
+split; last split.
+move => @/eq1'. proc.
+rcondf{1} 1 => //. auto. smt().
+rcondf{2} 1 => //. auto. smt().
+move => @/eq2'. proc.
+rcondf{1} 1 => //. auto. smt().
+inline. sp.
+rcondf{2} 1 => //. auto. smt().
+sp. rcondf{2} 1 => //. auto. smt().
+sp. auto. 
+move => @/eq3'. proc.
+rcondf{2} 1 => //. auto. smt().
+inline. sp.
+rcondf{1} 1 => //. auto. smt().
+sp. rcondf{1} 1 => //. auto. smt().
+auto.
+
+(* Inductive step *)
+move : IH => [_ [IH2 IH3]].
+split; last split.
+
+(* Case 1 *)
+
+move => @/eq1'. proc.
+case (d{1} = Env).
+
+(* Case 1.Env *)
+rcondf{1} 1. auto.
+rcondf{2} 1. auto.
+auto.
+case (d{1} = A).
+
+(* Case 1.A *)
+admit.
+
+(* Case 1.B *)
+admit.
+
+(* Case 2 *)
+
+move => @/eq2'. proc.
+admit.
+
+
+(* Case 3 *)
+
+move => @/eq3'. proc.
+admit.
+
 abort.
-
-
-
