@@ -1,3 +1,23 @@
-# Emacs backup
+# Emacs leftovers
 *~
 \#*#
+
+# Coq files
+*.vo
+*.glob
+*.v.d
+Makefile.coq
+Makefile.coq.bak
+Makefile.coq.conf
+.Makefile.coq.d
+*~
+.coq-native/
+*.aux
+*.vio
+*.vos
+*.vok
+.coqdeps.d
+.lia.cache
+
+# macOS files
+.DS_Store
