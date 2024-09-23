@@ -1,0 +1,35 @@
+-Q . SLF
+-arg -w 
+-arg -implicits-in-term,-redundant-canonical-projection,-several-object-files,-ambiguous-paths,-implicit-core-hint-db,-file-no-extension,-custom-entry-overriden,-custom-entry-overridden,-deprecated-hint-without-locality,-deprecated-ident-entry,-hiding-delimiting-key
+LibAxioms.v
+LibBool.v
+LibContainer.v
+LibCore.v
+LibEpsilon.v
+LibEqual.v
+LibInt.v
+LibList.v
+LibListExec.v
+LibListZ.v
+LibLogic.v
+LibMin.v
+LibMonoid.v
+LibMultiset.v
+LibNat.v
+LibOperation.v
+LibOption.v
+LibOrder.v
+LibProd.v
+LibReflect.v
+LibRelation.v
+LibSepFmap.v
+LibSepReference.v
+LibSepSimpl.v
+LibSepTLCbuffer.v
+LibSepVar.v
+LibSet.v
+LibString.v
+LibSum.v
+LibTactics.v
+LibUnit.v
+LibWf.v
