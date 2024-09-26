@@ -724,6 +724,36 @@ Proof using.
 Qed.
 
 
+Section SetOps.
+
+Variable T : Type.
+
+Implicit Type P Q R : [T].
+Implicit Type t : T.
+
+Definition subset_and P Q : [T] :=
+  fun t =>
+  P t /\ Q t.
+
+Definition subset_or P Q : [T] :=
+  fun t =>
+  P t \/ Q t.
+
+End SetOps.
+
+Notation "P '∩' Q" := (subset_and P Q) (left associativity, at level 40).
+
+Notation "P '∪' Q" := (subset_or P Q) (left associativity, at level 40).
+
+(*Section SetOpProperties.
+
+
+
+
+End SetOpProperties.*)
+
+
+
 Lemma destruct_if :
   forall B P Q,
   ((B -> P) /\ (~ B -> Q)) =
