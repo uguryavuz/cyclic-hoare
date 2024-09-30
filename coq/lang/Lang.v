@@ -12,207 +12,136 @@ Section Language.
 
 Notation varid := string.
 
-Inductive val :=
-| VInt (n:int)
-| VBool (b:bool)
-.
 
-Inductive vval :=
-| VId (x:varid)
-| VVal (v:val)
-.
-
-Definition mem := fmap varid val.
+Definition mem := varid -> int.
 Implicit Type m : mem.
 
-Global Instance Inhab_mem : Inhab val.
-Proof. constructor. exists~ (VInt 0). Qed.
-
-
-Definition getval m (vv:vval) : val :=
-  match vv with
-  | VId x => read m x
-  | VVal v => v
-  end.
-
-Definition inmem (m:mem) (vv:vval) : Prop :=
-  match vv with
-  | VId x => indom m x
-  | VVal _ => True
-  end.
-
-(*Inductive instr :=
-| EWrite (x : varid) (e : exp)
-| EBop (x : varid) (vv1 vv2 : vval) (op : lit -> lit -> lit)
-.*)
-
-Inductive uop :=
-| UNot | UNeg
+Inductive aexp :=
+| AVal (n:int)
+| AVar (x:varid)
+| ANeg (a:aexp)
+| AAdd (a1 a2:aexp)
+| ASub (a1 a2:aexp)
+| AMul (a1 a2:aexp)
 .
 
-Inductive bop :=
-| BAnd | BOr | BEq | BImp
-| BLeq | BLt | BAdd | BSub
+Inductive bexp :=
+| BVal (b:bool)
+| BNot (b:bexp)
+| BAnd (b1 b2:bexp)
+| BOr  (b1 b2:bexp)
+| BImp (b1 b2:bexp)
+| BEqB (b1 b2:bexp)
+| BEqA (a1 a2:aexp)
+| BLt  (a1 a2:aexp)
+| BLeq (a1 a2:aexp)
 .
 
-Inductive exp :=
-| EVar (x:varid)
-| EVal (v:val)
-| EUop (op : uop) (e:exp)
-| EBop (op : bop) (e1 e2 : exp)
-.
 
 Inductive cmd :=
 | CSkip
 | CSeq (c : cmd) (c : cmd)
-| CIf (e : exp) (c1 c2 : cmd)
-| CAssn (x : varid) (e : exp)
-| CWhile (e : exp) (c : cmd)
+| CIf (e : bexp) (c1 c2 : cmd)
+| CAssn (x : varid) (e : aexp)
+| CWhile (e : bexp) (c : cmd)
 .
 
-Inductive res :=
-| Good (m:mem)
-| Bot.
 
 
-Definition evaluop op v : option val :=
-match op, v with
-| UNot, VInt n => Some (VInt (-n))
-| UNeg, VBool b => Some (VBool (negb b))
-| _, _ => None
+Fixpoint aeval m a : int :=
+match a with
+| AVal n => n
+| AVar x => m x
+| ANeg a => -(aeval m a)
+| AAdd a1 a2 => (aeval m a1) + (aeval m a2)
+| ASub a1 a2 => (aeval m a1) - (aeval m a2)
+| AMul a1 a2 => (aeval m a1) * (aeval m a2)
+end.
+
+Fixpoint beval m b : bool :=
+match b with
+| BVal b => b
+| BNot b => ! (beval m b)
+| BAnd b1 b2 => (beval m b1) && (beval m b2)
+| BOr  b1 b2 => (beval m b1) || (beval m b2)
+| BImp b1 b2 => implb (beval m b1) (beval m b2)
+| BEqB b1 b2 => Bool.eqb (beval m b1) (beval m b2)
+| BEqA a1 a2 => Z.eqb (aeval m a1) (aeval m a2)
+| BLt  a1 a2 => Z.ltb (aeval m a1) (aeval m a2)
+| BLeq a1 a2 => Z.leb (aeval m a1) (aeval m a2)
 end.
 
 
-Definition evalbop op v1 v2 : option val :=
-match v1, v2 with
-| VBool b1, VBool b2 =>
-  match op with
-  | BAnd => Some (VBool (b1 && b2))
-  | BOr => Some (VBool (b1 || b2))
-  | BEq => Some (VBool (Bool.eqb b1 b2))
-  | BImp => Some (VBool (implb b1 b2))
-  | _ => None
-  end
-| VInt n1, VInt n2 =>
-  match op with
-  | BEq => Some (VBool (Z.eqb n1 n2))
-  | BLeq => Some (VBool (Z.leb n1 n2))
-  | BLt => Some (VBool (Z.ltb n1 n2))
-  | BAdd => Some (VInt (n1 + n2))
-  | BSub => Some (VInt (n1 - n2))
-  | _ => None
-  end
-| _, _ => None
-end.
-
-
-Fixpoint evalexp (m:mem) (e:exp) : option val :=
-match e with
-| EVar x => If indom m x then Some (read m x) else None
-| EVal v => Some v
-| EUop op e =>
-  match evalexp m e with
-  | Some v => evaluop op v
-  | None => None
-  end
-| EBop op e1 e2 =>
-  match evalexp m e1, evalexp m e2 with
-  | Some v1, Some v2 => evalbop op v1 v2
-  | _, _ => None
-  end
-end.
-
-Inductive evalcmd (m:mem) : cmd -> mem -> Prop :=
-| EvalSkip : evalcmd m CSkip m
-| EvalSeq m' m'' c1 c2
-  (H1 : evalcmd m c1 m')
-  (H2 : evalcmd m' c2 m'')
-  : evalcmd m (CSeq c1 c2) m''
-| EvalIfTrue m' e c1 c2
-  (Hg : evalexp m e = Some (VBool true))
-  (Hc : evalcmd m c1 m')
-  : evalcmd m (CIf e c1 c2) m'
-| EvalIfFalse m' e c1 c2
-  (Hg : evalexp m e = Some (VBool false))
-  (Hc : evalcmd m c2 m')
-  : evalcmd m (CIf e c1 c2) m'
-| EvalWhileTrue m' e c
-  (Hg : evalexp m e = Some (VBool true))
-  (Hc : evalcmd m (CSeq c (CWhile e c)) m')
-  : evalcmd m (CWhile e c) m'
-| EvalWhileFalse e c
-  (Hg : evalexp m e = Some (VBool false))
-  : evalcmd m (CWhile e c) m
-| EvalAssn x e v
-  (He : evalexp m e = Some v)
-  : evalcmd m (CAssn x e) (update m x v)
+Inductive cstep : cmd -> mem -> cmd -> mem -> Prop :=
+| StepSeq m m' c1 c1' c2
+  (H1 : cstep c1 m c1' m')
+  : cstep (CSeq c1 c2) m (CSeq c1' c2) m'
+| StepSeqSkip m c
+  : cstep (CSeq CSkip c) m c m
+| StepIfTrue m b c1 c2
+  (Hg : beval m b)
+  : cstep (CIf b c1 c2) m c1 m
+| StepIfFalse m b c1 c2
+  (Hg : ~ beval m b)
+  : cstep (CIf b c1 c2) m c2 m
+| StepWhileTrue m b c
+  (Hg : beval m b)
+  : cstep (CWhile b c) m (CSeq c (CWhile b c)) m
+| StepWhileFalse m b c
+  (Hg : ~ beval m b)
+  : cstep (CWhile b c) m CSkip m
+| StepAssn m x a
+  : cstep (CAssn x a) m CSkip (fun x' => If x = x' then aeval m a else m x')
 .
 
-(*
-  Fixpoint seqN (n:nat) c :=
-    match n with O => CSkip
-    | S n => CSeq c (seqN n c)
-    end.
 
-  Lemma while_iter e c :
-    forall m m',
-    evalcmd m (CWhile e c) m' ->
-    exists n,
-    evalcmd m (seqN n c) m'.
-  Proof using.
-  Abort.
+Inductive multistep : cmd -> mem -> cmd -> mem -> nat -> Prop :=
+| Multi0 c m : multistep c m c m O
+| MultiI c c' c'' m m' m'' n
+  (H : cstep c m c' m') 
+  (H' : multistep c' m' c'' m'' n)
+  : multistep c m c'' m'' (S n)
+.
 
+Definition yields c m m' :=
+  exists n, multistep c m CSkip m' n.
 
-  Example ex_loop x m n :
-    indom m x ->
-    read m x = VInt (Z_of_nat n) ->
-    n >= O ->
-    evalcmd m
-      (CWhile (EBop BLt (EInt 0) (EVar x)) 
-              (CAssn x (EBop BSub (EVar x) (EInt 1)))) 
-      (update m x (VInt 0)).
-  Proof using.
-    generalize dependent m.
-    intros.
-    induction n as [| ? | ?]; [admit|idtac|idtac].
+Definition terminates c m := 
+  exists m', yields c m m'.
 
-    induction n; intros; sort.
-    - replace (update _ _ _) with m.
-      applys EvalWhileFalse. admit.
-      simpl_fmap. admit.
-    - 
-  *)
+Definition diverges c m :=
+  ~ terminates c m.
 
 
-  (*
-  Lemma eval_uniq c :
-    forall m m1 m2,
-    evalcmd m c m1 ->
-    evalcmd m c m2 ->
-    m1 = m2.
-  Proof using.
-    destruct c.
-    -
-    Guarded.
-    cofix K.
-    intros. cofix c. cofix H H0.
-    induction c; introv H1 H2.
-    - inverts H1. inverts~ H2.
-    - inverts H1. inverts H2.
-      specializes IHc1 H4 H5. subst.
-      specializes IHc2 H6 H7.
-    - inverts H1; inverts H2.
-      + specializes IHc1 Hc Hc0.
-      + rewrite Hg in Hg0. inverts Hg0.
-      + rewrite Hg in Hg0. inverts Hg0.
-      + specializes IHc2 Hc Hc0.
-    - inverts H1. inverts H2.
-      rewrite He in He0. inverts~ He0.
-    - inverts H1; inverts~ H2.
-      2, 3: now rewrite Hg in Hg0.
-    *)
-
-
+Lemma seq_intermediate c1 c2 m m'' :
+  yields (CSeq c1 c2) m m'' ->
+  exists m',
+  yields c1 m m' /\
+  yields c2 m' m''.
+Proof using.
+  intros (n&H).
+  generalize dependent H.
+  generalize dependent c1.
+  generalize dependent c2.
+  generalize dependent m.
+  generalize dependent m''.
+  
+  induction n.
+  { intros. inverts H. }
+  intros. sort.
+  inverts H. sort.
+  inverts H5.
+  2: { 
+    exists m'. splits~.
+    unfolds. exists. constructor.
+    unfolds. exists. apply H'.
+  }
+  specializes IHn H'. exists* IHn.
+  exists m'0. splits~.
+  unfold yields in IHn. exists* IHn.
+  sort. unfolds. exists (S n0).
+  econstructor. apply H6. auto.
+Qed.
 
 End Language.
 
@@ -226,11 +155,6 @@ Proof using.
   contra H. now apply not_emptyset in H.
 Qed.
 
-
-Notation memp := (empty:mem).
-
-
-
 Ltac empty_inhab_false :=
   match goal with
   | [ H : ∅ _ |- _ ] => 
@@ -238,192 +162,68 @@ Ltac empty_inhab_false :=
   end.
 
 
-Section BoolExp.
-
-
-Definition support e m :=
-  match evalexp m e with
-  | Some _ => True
-  | _ => False
-  end.
-
-
-Definition is_bexp e :=
-  forall m,
-  match evalexp m e with
-  | None => True
-  | Some (VBool _) => True
-  | _ => False
-  end.
-
-Definition bexp := { e | is_bexp e }.
-
-Definition evalbexp m (P : bexp) :=
-  evalexp m (proj1_sig P).
-
-
-Definition is_bexp_bop op :=
-  forall P Q,
-  is_bexp P ->
-  is_bexp Q ->
-  is_bexp (EBop op P Q).
-
-Lemma is_bexp_and :
-  is_bexp_bop BAnd.
-Proof using.
-  intros P Q HP HQ m.
-  specializes HP m.
-  specializes HQ m. simpls.
-  destruct~ (evalexp m P).
-  destruct~ (evalexp m Q).
-  destruct~ v; now destruct~ v0.
-Qed.
-
-Lemma is_bexp_or :
-  is_bexp_bop BOr.
-Proof using.
-  intros P Q HP HQ m.
-  specializes HP m.
-  specializes HQ m. simpls.
-  destruct~ (evalexp m P).
-  destruct~ (evalexp m Q).
-  destruct~ v; now destruct~ v0.
-Qed.
-
-Lemma is_bexp_eq :
-  is_bexp_bop BEq.
-Proof using.
-  intros P Q HP HQ m.
-  specializes HP m.
-  specializes HQ m. simpls.
-  destruct~ (evalexp m P).
-  destruct~ (evalexp m Q).
-  destruct~ v; now destruct~ v0.
-Qed.
-
-Lemma is_bexp_imp :
-  is_bexp_bop BImp.
-Proof using.
-  intros P Q HP HQ m.
-  specializes HP m.
-  specializes HQ m. simpls.
-  destruct~ (evalexp m P).
-  destruct~ (evalexp m Q).
-  destruct~ v; now destruct~ v0.
-Qed.
-
-Lemma is_bexp_val b :
-  is_bexp (EVal (VBool b)).
-Proof using.
-  unfolds. simpls~.
-Qed.
-
-
-Lemma is_bexp_neg :
-  forall P,
-  is_bexp P ->
-  is_bexp (EUop UNeg P).
-Proof using.
-  intros ? ? ?. specializes H m.
-  simpls. destruct~ evalexp.
-  destruct~ v.
-Qed.
-
-End BoolExp.
-
-
 
 Section Interp.
 
 
 Definition interp (P : bexp) : [mem] :=
-  fun m =>
-  match evalbexp m P with
-  | Some (VBool true) => True
-  | None => True
-  | _ => False
-  end.
+  fun m => beval m P.
 
 Notation "'[[' P ']]'" := (interp P).
 
 
 Lemma interp_and (P Q : bexp) :
-  let ebexp := is_bexp_and (proj2_sig P) (proj2_sig Q) in
-  [[P]] ∩ [[Q]] = [[exist _ _ ebexp]].
+  [[BAnd P Q]] = [[P]] ∩ [[Q]].
 Proof using.
-  simpls. destruct P as (P&BP), Q as (Q&BQ).
-  simpls. extensionality m. apply prop_ext.
-  unfolds interp, evalbexp, subset_and.
-  simpls.
-  specializes BP m. specializes BQ m.
-  destruct evalexp. destruct v; try easy.
-  all: destruct evalexp. all: try destruct v; try easy.
-  destruct b, b0; simpls~; easy.
-  splits; intros; try easy. splits; intros; try easy.
+  unfolds. extensionality m.
+  simpls. unfolds subset_and.
+  apply istrue_and_eq.
 Qed.
-
-
-Lemma interp_support P :
-  [[P]] ⊆ support (proj1_sig P).
-Proof using.
-  introv H. inverts H.
-  unfolds. destruct P as (P&BP).
-  unfolds evalbexp. simpls.
-  now rewrite H1.
-Qed.
-
 
 Lemma interp_or (P Q : bexp) :
-  let ebexp := is_bexp_or (proj2_sig P) (proj2_sig Q) in
-  ([[P]] ∪ [[Q]]) ∩ support (proj1_sig P) ∩ support (proj1_sig Q)
-  = [[exist _ _ ebexp]].
+  [[BOr P Q]] = [[P]] ∪ [[Q]].
 Proof using.
-  simpls. destruct P as (P&BP), Q as (Q&BQ).
-  simpls. extensionality m. apply prop_ext.
-  unfolds interp, evalbexp, subset_or, subset_and, support.
-  simpls.
-  specializes BP m. specializes BQ m.
-  destruct evalexp eqn:E in BP; destruct evalexp eqn:F in BQ.
-  all: rewrite E, F in *.
-  all: try destruct v; try destruct v0; simpls; try easy.
-  destruct b, b0; simpls. all: splits~.
-  intros. destruct~ H. destruct~ H. destruct~ H.
+  extensionality m.
+  unfolds. simpls.
+  unfolds subset_or.
+  apply istrue_or_eq.
 Qed.
-
 
 Lemma interp_true :
-  let ebexp := is_bexp_val true in
-  [[exist _ _ ebexp]] = ⬤.
+  [[BVal true]] = ⬤.
 Proof using.
-  simpls. unfold interp, evalbexp, evalexp, univ_set.
-  simpls. extensionality m. now apply prop_ext.
+  unfolds. extensionality m.
+  simpls. rewrite istrue_true_eq.
+  symmetry. apply univ_set_true.
 Qed.
-
 
 Lemma interp_false :
-  let ebexp := is_bexp_val false in
-  [[exist _ _ ebexp]] = ∅.
+  [[BVal false]] = ∅.
 Proof using.
-  simpls. unfold interp, evalbexp, evalexp.
-  apply eq_emptyset. intro. simpls. now exists* H.
+  unfolds. extensionality m.
+  simpls. rewrite istrue_false_eq.
+  symmetry. apply emptyset_false.
 Qed.
 
-
-Lemma interp_not (P : bexp) :
-  let ebexp := is_bexp_neg (proj2_sig P) in
-  [[exist _ _ ebexp]] = 
-  fun m => evalexp m (proj1_sig P) = Some (VBool false).
+Lemma interp_not P :
+  [[BNot P]] = not ∘ [[P]].
 Proof using.
-  simpls. unfold interp, evalbexp.
-  destruct P as (P&BP). simpls.
-  extensionality m. specializes BP m.
-  destruct~ evalexp.
-  2: { apply prop_ext; splits; intros; discriminate. }
-  destruct~ v; try easy.
-  destruct~ b; simpls~.
-  apply prop_ext; splits; intros; discriminate.
-  apply prop_ext; splits; auto.
+  unfolds. extensionality m.
+  simpls. now rewrite istrue_neg_eq.
 Qed.
+
+Lemma interp_imp (P Q : bexp) :
+  [[BImp P Q]] = not ∘ [[P]] ∪ [[Q]].
+Proof using.
+  unfolds. extensionality m.
+  simpls. rewrite Bool.implb_orb.
+  unfolds subset_or.
+  destruct (beval m P), (beval m Q); simpls.
+  all: try rewrite istrue_true_eq; try rewrite istrue_false_eq.
+  - symmetry. rewrite prop_eq_True_eq. right~.
+  - symmetry. apply prop_eq_False. intro.
+    destruct~ H.
+  - symmetry. rewrite prop_eq_True_eq.
 
 
 Lemma interp_impl (P Q : bexp) :
