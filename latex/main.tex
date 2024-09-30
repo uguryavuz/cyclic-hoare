@@ -41,108 +41,86 @@
 
 \subsection*{Syntax}
 
-\newcommand*{\ALT}{\ \ |\ \ }
-
 \begin{displaymath}
-\begin{array}{rcl}
-    n & \in & \Z \\
-    x & \in  & \domvar \\
-    v & \bnf & n \ALT \True \ALT \False \\
-    c & \bnf & \Skip \ALT \Assn x = e
+\begin{array}{lrcl}
+    & n & \in & \Z \\
+    & x & \in  & \domvar \\
+    \domvar & v & \bnf & n \ALT \True \ALT \False \\
+    \DomAexp & a & \bnf & x \ALT n \ALT a + a \ALT a - a \ALT a \times a \\
+    \DomBexp & b & \bnf & \True \ALT \False \ALT 
+        \neg b \ALT b \wedge b \ALT b \vee b \ALT b \Rightarrow b \\\
+    && \ALT & a = a \ALT b = b \ALT a < a \ALT a \leq a \\
+    & e & \bnf & a \ALT b \\ 
+    \DomComm & c & \bnf & \Skip \ALT \Assn x = a
         \ALT \Seq c ; c \\
-    & | & \ITE e then c else c \\
-    & | & \While e do c \\
-    e & \bnf & x \ALT n \ALT \True \ALT \False \\
-    & | & \neg e \ALT e \wedge e \ALT e \vee e \ALT e \Rightarrow e \\
-    & | & e = e \ALT e < e \ALT e \leq e \\
-    & | & e + e \ALT e - e
+    && | & \ITE b then c else c \\
+    && | & \While b do c
 \end{array}
 \end{displaymath}
 
 \subsection*{Memories and expressions}
 
-Memories (in the family $\Mems$) are finite partial maps from variable names to values.
-
-
+Memories (in the family $\Mems$)
+are total maps from variables (\domvar) to integers.
+%
 We define the \emph{evaluation} of an expression $e$
 w.r.t.\ a memory $m$, denoted $\Eval(e,m)$,
-to yield either one value $v \in \Vals$,
-or $\bot$ as a failure state
-(e.g.\ variable not defined in memory, division by zero).
+to yield exactly one value $v \in \Vals$.
 
 {
 \newcommand{\LINE}[2]{
     \Eval(#1,m) &\triangleq& #2 \\
 }
 
-\begin{displaymath}
+\begin{mathpar}
 \begin{array}{rcl}
-\LINE x 
-    {m(x) \text{ if } x \in m \text{ else } \bot}
+\LINE x {m(x)}
 \LINE n n
 \LINE \True \True
 \LINE \False \False
-\LINE {\neg e} 
-    {\neg \Eval(e,m) \text{ if } \Eval(e,m) \in \set{\True,\False} \text{ else } \bot}
-\LINE {e_1 \wedge e_2} {
-    \Eval(e_1,m) \wedge \Eval(e_2,m)
-    \text{ if }
-        \Eval(e_1,m), \Eval(e_2,m) \in \set{\True,\False}
-    \text{ else } \bot}
-\LINE {e_1 \vee e_2} {
-    \Eval(e_1,m) \vee \Eval(e_2,m)
-    \text{ if }
-        \Eval(e_1,m), \Eval(e_2,m) \in \set{\True,\False}
-    \text{ else } \bot}
-\LINE {e_1 \Rightarrow e_2} {
-    \Eval(e_1,m) \Rightarrow \Eval(e_2,m)
-    \text{ if }
-        \Eval(e_1,m), \Eval(e_2,m) \in \set{\True,\False}
-    \text{ else } \bot}
-\LINE {e_1 = e_2} {
-    \Eval(e_1,m) = \Eval(e_2,m)
-    \text{ if }
-        \Eval(e_1,m), \Eval(e_2,m) \neq \bot
-    \text{ else } \bot}
-\LINE {e_1 < e_2} {
-    \Eval(e_1,m) < \Eval(e_2,m)
-    \text{ if }
-        \Eval(e_1,m), \Eval(e_2,m) \in \Z
-    \text{ else } \bot}
-\LINE {e_1 \leq e_2} {
-    \Eval(e_1,m) \leq \Eval(e_2,m)
-    \text{ if }
-        \Eval(e_1,m), \Eval(e_2,m) \in \Z
-    \text{ else } \bot}
-\LINE {e_1 + e_2} {
-    \Eval(e_1,m) + \Eval(e_2,m)
-    \text{ if }
-        \Eval(e_1,m), \Eval(e_2,m) \in \Z
-    \text{ else } \bot}
-\LINE {e_1 - e_2} {
-    \Eval(e_1,m) - \Eval(e_2,m)
-    \text{ if }
-        \Eval(e_1,m), \Eval(e_2,m) \in \Z
-    \text{ else } \bot}
+\LINE {\neg b} 
+    {\neg \Eval(b,m)}
+\LINE {b_1 \wedge b_2} {
+    \Eval(b_1,m) \wedge \Eval(b_2,m)}
+\LINE {b_1 \vee b_2} {
+    \Eval(b_1,m) \vee \Eval(b_2,m)}
+\LINE {b_1 \Rightarrow b_2} {
+    \Eval(b_1,m) \Rightarrow \Eval(b_2,m)}
 \end{array}
-\end{displaymath}
+\and
+\begin{array}{rcl}
+\LINE {a_1 = a_2} {
+    \Eval(a_1,m) = \Eval(a_2,m)}
+\LINE {b_1 = b_2} {
+    \Eval(b_1,m) = \Eval(b_2,m)}
+\LINE {a_1 < a_2} {
+    \Eval(a_1,m) < \Eval(a_2,m)}
+\LINE {a_1 \leq a_2} {
+    \Eval(a_1,m) \leq \Eval(a_2,m)}
+\LINE {a_1 + a_2} {
+    \Eval(a_1,m) + \Eval(a_2,m)}
+\LINE {a_1 - a_2} {
+    \Eval(a_1,m) - \Eval(a_2,m)}
+\LINE {a_1 \times a_2} {
+    \Eval(a_1,m) \times \Eval(a_2,m)}
+\end{array}
+\end{mathpar}
 
 }
 
-Define the support of an expression $e$ as
-$\Support e \triangleq \SetBuild(m | {\Eval(e,m) \neq \bot})$.
+%Define the support of an expression $e$ as
+%$\Support e \triangleq \SetBuild(m | {\Eval(e,m) \neq \bot})$.
 
-A \emph{boolean expression} is an expression $P$ s.t.
-$\forall m.\ \Eval(P,m) \in \set{\True,\False,\bot}$.
-Call this family of expressions $\BoolExps$.
+%A \emph{boolean expression} is an expression $P$ s.t.
+%$\forall m.\ \Eval(P,m) \in \set{\True,\False,\bot}$.
+%Call this family of expressions $\BoolExps$.
 %
-We define the \emph{interpretation} of $P,Q \in \BoolExps$
+We define the \emph{interpretation} of $P,Q \in \DomBexp$
 to yield the subset of memories
 in which the expression holds:
 $\Interp P \triangleq \SetBuild(m | {\Eval(P,m) = \True})$.
 Properties of interpretation include (all proven in Coq):
-\todo{Maybe the def of interpretation should be all sets which yield bot or true. I think that cleans things up maybe?
-Alternatively, validity can be defined relative to a memory, e.g. $m \vDash P$. Alternatively still, memories can be defined as total and programs are assumed to be well-typed so that expressions never yield bot.}
+
 \begin{displaymath}
 \begin{array}{rcl}
 \Interp{\neg P} & = & \SetBuild(m | {\Eval(P,m) = \False}) \\
@@ -162,23 +140,23 @@ it yields $\True$.
 Properties include:
 {
 
-\newcommand*{\LINE}[2]{%
-    \VAL #1 & \text{iff} & #2 \\
+\newcommand*{\LINE}[3]{%
+    \VAL #1 & \text{#3} & #2 \\
 }
 
-\begin{mathpar}
-    \inferrule{
-        \VAL P \\ \VAL Q
-    }{
-    \VAL P \wedge Q
-    }
-\end{mathpar}
+%\begin{mathpar}
+%    \inferrule{
+%        \VAL P \\ \VAL Q
+%    }{
+%    \VAL P \wedge Q
+%    }
+%\end{mathpar}
 
 \begin{displaymath}
 \begin{array}{rcl}
-\LINE {P \wedge Q}{\VAL P \text{ and } \VAL Q} \\
-\LINE {P \Rightarrow Q}{\Interp P \subseteq \Interp Q}
-\LINE {P \vee Q}{\VAL P \text{ or } \VAL Q}
+\LINE {P \wedge Q}{\VAL P \text{ and } \VAL Q}{iff}
+\LINE {P \Rightarrow Q}{\Interp P \subseteq \Interp Q}{iff}
+\LINE {P \vee Q}{\VAL P \text{ or } \VAL Q}{if}
 \end{array}
 \end{displaymath}
 
@@ -190,8 +168,8 @@ Properties include:
 \begin{mathpar}
     % Assignment
     \inferrule*[right=SS-Assn]
-    { \Eval(e,m)=v \neq \bot }
-    { \Cfg(\Assn x = e, m) \sstepsto \Cfg(\Skip, \MemDef m[x->v]) }
+    { \Eval(a,m)=v }
+    { \Cfg(\Assn x = a, m) \sstepsto \Cfg(\Skip, \MemDef m[x->v]) }
     % Sequencing
     \\ \inferrule*[right=SS-Seq]
     { \Cfg(c_0,m) \sstepsto \Cfg(c'_0,m') }
@@ -202,20 +180,20 @@ Properties include:
     { \Cfg(\Seq \Skip ; c, m) \sstepsto \Cfg(c, m) }
     % If true
     \and \inferrule*[right=SS-If-T]
-    { \Eval(e,m) = \True}
-    { \Cfg(\ITE e then c_1 else c_2, m) \sstepsto \Cfg(c_1, m)}
+    { \Eval(b,m) = \True}
+    { \Cfg(\ITE b then c_1 else c_2, m) \sstepsto \Cfg(c_1, m)}
     % If false
     \and \inferrule*[right=SS-If-F]
-    { \Eval(e,m) = \False}
-    { \Cfg(\ITE e then c_1 else c_2, m) \sstepsto \Cfg(c_2, m)}
+    { \Eval(b,m) = \False}
+    { \Cfg(\ITE b then c_1 else c_2, m) \sstepsto \Cfg(c_2, m)}
     % While true
     \and \inferrule*[right=SS-While-T]
-    { \Eval(e,m) = \True}
-    { \Cfg(\While e do c, m) \sstepsto \Cfg(\Seq c; \While e do c, m)}
+    { \Eval(b,m) = \True}
+    { \Cfg(\While b do c, m) \sstepsto \Cfg(\Seq c; \While b do c, m)}
     % While false
     \and \inferrule*[right=SS-While-F]
-    { \Eval(e,m) = \False}
-    { \Cfg(\While e do c, m) \sstepsto \Cfg(\Skip, m)}
+    { \Eval(b,m) = \False}
+    { \Cfg(\While b do c, m) \sstepsto \Cfg(\Skip, m)}
 \end{mathpar}
 
 % \[
@@ -251,10 +229,10 @@ and $\forall i \in [0,k).\ \Cfg(c_i,m_i) \sstepstotrans \Cfg(c_{i+1},m_{i+1})$.
     If $\Cfg(c_1; c_2, m) \sstepstotrans \Cfg(\Skip, m')$, 
     then there exists an intermediate memory $m''$ such that
     $\Cfg(c_1, m) \sstepstotrans \Cfg(\Skip, m'')$
-    and $\Cfg(c_2, m'') \sstepstotrans \Cfg(\Skip, m)$.
+    and $\Cfg(c_2, m'') \sstepstotrans \Cfg(\Skip, m')$.
 \end{lemma}
 \begin{proof}
-    \todo{Proof by induction on length of execution.}
+    Proof by induction on length of execution. See Coq proof.
 \end{proof}
 
 % \subsection{Memories}
@@ -324,27 +302,27 @@ the triple is \emph{derivable} in Hoare logic.
     \and
     \inferrule*[right=HL-Assn]
     { }
-    { \DER \Triple \Assn x = e : \Subst P[e/x] => P }
+    { \DER \Triple \Assn x = a : \Subst P[a/x] => P }
     \and
     \inferrule*[right=HL-Seq]
     { \DER \Triple c : P => Q \\ \DER \Triple c' : Q => R }   
     { \DER \Triple \Seq c;c' : P => R }
     \\
     \inferrule*[right=HL-If-T]
-    { \DER \Triple c : P \wedge e => Q }
-    { \DER \Triple \ITE e then c else c' : P \wedge e => Q }
+    { \DER \Triple c : P \wedge b => Q }
+    { \DER \Triple \ITE b then c else c' : P \wedge b => Q }
     \and
     \inferrule*[right=HL-If-F]
-    { \DER \Triple c' : P \wedge \neg e => Q }
-    { \DER \Triple \ITE e then c else c' : P \wedge \neg e => Q }
+    { \DER \Triple c' : P \wedge \neg b => Q }
+    { \DER \Triple \ITE b then c else c' : P \wedge \neg b => Q }
     \\
     \inferrule*[right=HL-While-T]
-    { \DER \Triple \Seq c; \While e do c : P \wedge e => Q }
-    { \DER \Triple \While e do c : P \wedge e => Q \wedge \neg e }
+    { \DER \Triple \Seq c; \While b do c : P \wedge b => Q }
+    { \DER \Triple \While b do c : P \wedge b => Q \wedge \neg b }
     \and
     \inferrule*[right=HL-While-F]
     { }
-    { \DER \Triple \While e do c : P \wedge \neg e => P \wedge \neg e }
+    { \DER \Triple \While b do c : P \wedge \neg b => P \wedge \neg b }
 \end{mathpar}
 
 
