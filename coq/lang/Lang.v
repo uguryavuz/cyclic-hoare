@@ -223,21 +223,8 @@ Proof using.
   - symmetry. rewrite prop_eq_True_eq. right~.
   - symmetry. apply prop_eq_False. intro.
     destruct~ H.
-  - symmetry. rewrite prop_eq_True_eq.
-
-
-Lemma interp_impl (P Q : bexp) :
-  let ebexp := is_bexp_imp (proj2_sig P) (proj2_sig Q) in
-  [[exist _ _ ebexp]] =
-  [[exist _ _ (is_bexp_or (is_bexp_neg (proj2_sig P)) (proj2_sig Q))]].
-Proof using.
-  simpls. destruct P as (P&BP), Q as (Q&BQ).
-  simpls. unfold interp, evalbexp. simpls.
-  extensionality m. specializes BP m. specializes BQ m.
-  destruct evalexp eqn:E in BP; destruct evalexp eqn:F in BQ.
-  all: try destruct v; try destruct v0; try easy.
-  all: try rewrite E; try rewrite F; try easy.
-  destruct b, b0; simpls; try easy.
+  - symmetry. rewrite prop_eq_True_eq. right~.
+  - symmetry. rewrite prop_eq_True_eq. left~.
 Qed.
 
 
@@ -250,33 +237,24 @@ Notation "'[[' P ']]'" := (interp P).
 Section Valid.
 
 
-Definition valid (P : bexp) :=
-  forall m,
-  match evalbexp m P with
-  | None => True
-  | Some (VBool true) => True
-  | _ => False
-  end.
+Definition valid (b : bexp) :=
+  forall m, beval m b.
+
+
+Lemma valid_interp b :
+  valid b <-> [[b]] = ⬤.
+Proof using.
+  splits; intros.
+  unfolds interp, valid.
+  extensionality m. specializes H m.
+  auto.
+  intro. apply equal_f with m in H.
+  unfolds in H.
+  rewrite H. now rewrite univ_set_true.
+Qed.
+
 
 Notation "'⊨' P" := (valid P) (at level 50).
-
-
-Lemma valid_support P :
-  ⊨ P <->
-  support (proj1_sig P) = [[P]].
-Proof using.
-  destruct P as (P&BP). simpls.
-  unfolds valid, interp, support, evalbexp. simpls.
-  splits; intros H. 
-  extensionality m. apply prop_ext; splits; intros H'.
-  - specializes H m. destruct~ evalexp. destruct~ v; try easy.
-    destruct~ b. easy. easy.
-  - specializes H m. now rewrite H' in *.
-  - intro. apply equal_f with m in H.
-    specializes BP m. destruct~ evalexp.
-    destruct~ v. destruct~ b.
-    apply eq_sym in H. now rewrite prop_eq_True_eq in H.
-Qed.
 
 
 Lemma true_eq H :
@@ -288,53 +266,41 @@ Qed.
 
 
 Lemma valid_and (P Q : bexp) :
-  ⊨ P /\ ⊨ Q ->
-  ⊨ exist _ _ (is_bexp_and (proj2_sig P) (proj2_sig Q)).
+  ⊨ BAnd P Q <-> (⊨ P /\ ⊨ Q).
 Proof using.
-  repeat rewrite valid_support.
-  simpls. rewrite <- interp_and.
-  destruct P as (P&BP), Q as (Q&BQ). simpls.
-  intros (?&?).
-  extensionality m.
-  unfolds support, interp, evalbexp. simpls.
-  specializes BP m. specializes BQ m.
-  apply equal_f with m in H, H0.
-  destruct (evalexp _ P) eqn:E;
-  destruct (evalexp _ Q) eqn:F.
-  - destruct v, v0; try easy.
-    simpls. unfold subset_and.
-    rewrite E, F, true_eq in *.
-    inverts H. inverts H0. auto.
-  - destruct v; try easy.
-    unfold subset_and.
-    rewrite E, F in *.
-    apply prop_ext; splits; intros; try easy.
-  - destruct v; try easy.
-    unfold subset_and.
-    rewrite E, F in *.
-    apply prop_ext; splits; intros; try easy.
-  - unfold subset_and.
-    rewrite E, F in *.
-    apply prop_ext; splits; intros; try easy.
+  unfolds valid. splits; intros.
+  - apply forall_conj_inv_1. intros.
+    specializes H x1. simpls.
+    now rewrite <- istrue_and_eq.
+  - destruct H. specializes H m. specializes H0 m.
+    simpls. rewrite istrue_and_eq. splits~.  
 Qed.
 
+Lemma valid_or (P Q : bexp) :
+  (⊨ P \/ ⊨ Q) -> ⊨ BOr P Q.
+Proof using.
+  unfolds valid. intros. simpls.
+  rewrite istrue_or_eq.
+  destruct H; specializes H m.
+  auto. auto.
+Qed.
 
 Lemma valid_imp (P Q : bexp) :
-  [[P]] ⊆ [[Q]] ->
-  ⊨ exist _ _ (is_bexp_imp (proj2_sig P) (proj2_sig Q)).
+  [[P]] ⊆ [[Q]] <->
+  ⊨ BImp P Q.
 Proof using.
-  destruct P as (P&BP), Q as (Q&BQ). simpls.
-  rewrite valid_support. simpls.
-  unfolds support, interp, evalbexp. simpls.
-  intros H. extensionality m.
-  specializes BP m. specializes BQ m. specializes H m.
-  destruct (evalexp m P) eqn:E. destruct v; try easy.
-  simpls. destruct (evalexp m Q) eqn:F.
-  destruct v; try easy.
-  apply true_eq. destruct b; try easy.
-  destruct~ H. destruct b; try easy.
-  destruct~ H.
-Abort.
+  splits; intros.
+  - intro m. simpls. specializes H m.
+    unfolds interp.
+    destruct (beval m P).
+    2: { now rewrite Bool.implb_false_l. }
+    destruct~ H. now rewrite Bool.implb_same.
+  - intros m HP. unfolds valid, interp.
+    simpls. specializes H m.
+    destruct (beval m P).
+    2: { easy. }
+    now destruct (beval m Q).
+Qed.
 
 
 End Valid.
