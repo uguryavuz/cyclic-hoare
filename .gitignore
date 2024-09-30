@@ -21,3 +21,10 @@ Makefile.coq.conf
 
 # macOS files
 .DS_Store
+
+# LaTeX files
+*.aux
+*.log
+*.out
+*.synctex.gz
+*.pdf

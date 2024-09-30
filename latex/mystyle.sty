@@ -1,0 +1,79 @@
+% Semantics
+
+\newcommand{\sstepsto}{\mathrel{\longrightarrow}}
+
+\newcommand{\sstepstotrans}{\mathrel{\sstepsto^{\ast}}}
+
+\newcommand{\bnf}{\mathrel{\Coloneqq}}
+
+
+% Syntax
+
+\newcommand*{\domvar}{\textsf{Var}}
+
+\newcommand{\Abort}{\mathsf{abort}}
+\newcommand{\False}{\textbf{false}}
+\newcommand{\Skip}{\mathsf{skip}}
+\newcommand{\True}{\textbf{true}}
+\def\Assn#1=#2{#1\coloneqq#2}
+\def\Cfg(#1,#2){\left\langle #1, #2 \right\rangle}
+\def\Eval(#1,#2){\left\llbracket #1 \right\rrbracket_{#2}}
+\def\ITE#1 then #2 else #3 {%
+    \mathsf{if}\ #1\ \mathsf{then}\ #2\ \mathsf{else}\ #3%
+}
+\def\MemDef #1[#2->#3]{#1\mathopen{}\left[#2 \mapsto #3\right]\mathclose{}}
+\def\Seq#1;#2{#1\mathop{;}#2}
+\def\While #1 do #2 {\mathsf{while}\ #1\ \mathsf{do}\ #2}
+
+\def\Subst#1[#2/#3]{%
+    #1\mathopen{}\left[%
+        #2{/}#3%
+    \right]\mathclose{}
+}
+
+\def\Diverge(#1,#2){%
+    \mathopen{}\left\langle #1, #2 \right\rangle\mathclose{}%
+    {\Uparrow}%
+}
+
+\def\Terminate(#1,#2){%
+    \mathopen{}\left\langle #1, #2 \right\rangle\mathclose{}%
+    {\Downarrow}%
+}
+
+\newcommand{\Interp}[1]{%
+    \left\llbracket #1 \right\rrbracket%
+}
+
+\newcommand{\Support}[1]{%
+    \mathsf{Supp}(#1)
+}
+
+\def\SetBuild(#1|#2){%
+    \left\{#1\mid#2\right\}
+}
+
+\newcommand{\Set}[1]{%
+    \left\{#1\right\}
+}
+
+\newcommand{\Mems}{\mathbb{M}}
+\newcommand{\Vals}{\mathbb{V}}
+\newcommand{\BoolExps}{\mathbb{B}}
+\newcommand{\ETrue}{\True}
+\newcommand{\EFalse}{\False}
+
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+
+% Logic
+
+\def\Triple#1:#2=>#3{ #1 \mathrel{:} #2 \Rightarrow #3 }
+\def\Quad#1~#2:#3=>#4{ #1 \sim #2 \mathrel{:} #3 \Rightarrow #4 }
+
+\newcommand{\VAL}{\vDash}
+\newcommand{\DER}{\vdash}
+
+\newcommand{\todo}[1]{{\color{red}#1}}
+
+\newcommand*{\set}[1]{\left\{#1\right\}}

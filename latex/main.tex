@@ -1,0 +1,698 @@
+\documentclass[10pt]{article}
+\usepackage[margin=1.2in]{geometry}
+
+\usepackage{xcolor}
+\usepackage{amsmath}  % Align math mode
+\usepackage{amssymb}  % Symbols
+\usepackage{amsthm}   % Numbered thm/def environments
+\usepackage{ebproof}  % Inference rules
+\usepackage{enumitem} % Enumeration
+\usepackage{graphicx} % Graphics
+\usepackage{hyperref} % Hyperlinks
+\usepackage{mathpazo} % Palatino - was there ever any other choice?
+\usepackage{mathtools}
+\usepackage{stmaryrd}
+\usepackage{setspace} % Line spacing
+\usepackage{titlesec}
+\usepackage{mathpartir}
+
+\usepackage{mystyle}
+
+\titleformat{\subsubsection}[runin]
+  {\normalfont\normalsize\bfseries}{\thesubsubsection}{1em}{}
+
+% Numbered environments
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\newtheorem{example}{Example}
+\newtheorem{theorem}{Theorem}
+\newtheorem{conjecture}{Conjecture}
+\newtheorem{lemma}{Lemma}
+\newtheorem*{theorem*}{Theorem}
+\newtheorem{corollary}{Corollary}[theorem]
+
+% \title{Cyclic-Proj}
+% \author{Ugur Yavuz}
+% \date{May 2024}
+
+\begin{document}
+
+\section{Operational semantics of the \textsc{While} language}
+
+\subsection*{Syntax}
+
+\newcommand*{\ALT}{\ \ |\ \ }
+
+\begin{displaymath}
+\begin{array}{rcl}
+    n & \in & \Z \\
+    x & \in  & \domvar \\
+    v & \bnf & n \ALT \True \ALT \False \\
+    c & \bnf & \Skip \ALT \Assn x = e
+        \ALT \Seq c ; c \\
+    & | & \ITE e then c else c \\
+    & | & \While e do c \\
+    e & \bnf & x \ALT n \ALT \True \ALT \False \\
+    & | & \neg e \ALT e \wedge e \ALT e \vee e \ALT e \Rightarrow e \\
+    & | & e = e \ALT e < e \ALT e \leq e \\
+    & | & e + e \ALT e - e
+\end{array}
+\end{displaymath}
+
+\subsection*{Memories and expressions}
+
+Memories (in the family $\Mems$) are finite partial maps from variable names to values.
+
+
+We define the \emph{evaluation} of an expression $e$
+w.r.t.\ a memory $m$, denoted $\Eval(e,m)$,
+to yield either one value $v \in \Vals$,
+or $\bot$ as a failure state
+(e.g.\ variable not defined in memory, division by zero).
+
+{
+\newcommand{\LINE}[2]{
+    \Eval(#1,m) &\triangleq& #2 \\
+}
+
+\begin{displaymath}
+\begin{array}{rcl}
+\LINE x 
+    {m(x) \text{ if } x \in m \text{ else } \bot}
+\LINE n n
+\LINE \True \True
+\LINE \False \False
+\LINE {\neg e} 
+    {\neg \Eval(e,m) \text{ if } \Eval(e,m) \in \set{\True,\False} \text{ else } \bot}
+\LINE {e_1 \wedge e_2} {
+    \Eval(e_1,m) \wedge \Eval(e_2,m)
+    \text{ if }
+        \Eval(e_1,m), \Eval(e_2,m) \in \set{\True,\False}
+    \text{ else } \bot}
+\LINE {e_1 \vee e_2} {
+    \Eval(e_1,m) \vee \Eval(e_2,m)
+    \text{ if }
+        \Eval(e_1,m), \Eval(e_2,m) \in \set{\True,\False}
+    \text{ else } \bot}
+\LINE {e_1 \Rightarrow e_2} {
+    \Eval(e_1,m) \Rightarrow \Eval(e_2,m)
+    \text{ if }
+        \Eval(e_1,m), \Eval(e_2,m) \in \set{\True,\False}
+    \text{ else } \bot}
+\LINE {e_1 = e_2} {
+    \Eval(e_1,m) = \Eval(e_2,m)
+    \text{ if }
+        \Eval(e_1,m), \Eval(e_2,m) \neq \bot
+    \text{ else } \bot}
+\LINE {e_1 < e_2} {
+    \Eval(e_1,m) < \Eval(e_2,m)
+    \text{ if }
+        \Eval(e_1,m), \Eval(e_2,m) \in \Z
+    \text{ else } \bot}
+\LINE {e_1 \leq e_2} {
+    \Eval(e_1,m) \leq \Eval(e_2,m)
+    \text{ if }
+        \Eval(e_1,m), \Eval(e_2,m) \in \Z
+    \text{ else } \bot}
+\LINE {e_1 + e_2} {
+    \Eval(e_1,m) + \Eval(e_2,m)
+    \text{ if }
+        \Eval(e_1,m), \Eval(e_2,m) \in \Z
+    \text{ else } \bot}
+\LINE {e_1 - e_2} {
+    \Eval(e_1,m) - \Eval(e_2,m)
+    \text{ if }
+        \Eval(e_1,m), \Eval(e_2,m) \in \Z
+    \text{ else } \bot}
+\end{array}
+\end{displaymath}
+
+}
+
+Define the support of an expression $e$ as
+$\Support e \triangleq \SetBuild(m | {\Eval(e,m) \neq \bot})$.
+
+A \emph{boolean expression} is an expression $P$ s.t.
+$\forall m.\ \Eval(P,m) \in \set{\True,\False,\bot}$.
+Call this family of expressions $\BoolExps$.
+%
+We define the \emph{interpretation} of $P,Q \in \BoolExps$
+to yield the subset of memories
+in which the expression holds:
+$\Interp P \triangleq \SetBuild(m | {\Eval(P,m) = \True})$.
+Properties of interpretation include (all proven in Coq):
+\todo{Maybe the def of interpretation should be all sets which yield bot or true. I think that cleans things up maybe?
+Alternatively, validity can be defined relative to a memory, e.g. $m \vDash P$. Alternatively still, memories can be defined as total and programs are assumed to be well-typed so that expressions never yield bot.}
+\begin{displaymath}
+\begin{array}{rcl}
+\Interp{\neg P} & = & \SetBuild(m | {\Eval(P,m) = \False}) \\
+\Interp{P \wedge Q} & = & \Interp{P} \cap \Interp{Q} \\
+\Interp{P \vee Q} & = & (\Interp{P} \cup \Interp{Q}) \cap \Support P \cap \Support Q \\
+\Interp{P \Rightarrow Q} & = & \Interp{\neg P \vee Q} \\
+\Interp{\ETrue} & = & \Mems  \\
+\Interp{\EFalse} & = & \emptyset \\
+\end{array}
+\end{displaymath}
+
+A boolean expression is \emph{valid},
+denoted $\VAL P$,
+iff $\Support P = \Interp P$.
+In other words, whenever $P$ evaluates,
+it yields $\True$.
+Properties include:
+{
+
+\newcommand*{\LINE}[2]{%
+    \VAL #1 & \text{iff} & #2 \\
+}
+
+\begin{mathpar}
+    \inferrule{
+        \VAL P \\ \VAL Q
+    }{
+    \VAL P \wedge Q
+    }
+\end{mathpar}
+
+\begin{displaymath}
+\begin{array}{rcl}
+\LINE {P \wedge Q}{\VAL P \text{ and } \VAL Q} \\
+\LINE {P \Rightarrow Q}{\Interp P \subseteq \Interp Q}
+\LINE {P \vee Q}{\VAL P \text{ or } \VAL Q}
+\end{array}
+\end{displaymath}
+
+}
+
+
+\subsection*{Small-step operational semantics}
+
+\begin{mathpar}
+    % Assignment
+    \inferrule*[right=SS-Assn]
+    { \Eval(e,m)=v \neq \bot }
+    { \Cfg(\Assn x = e, m) \sstepsto \Cfg(\Skip, \MemDef m[x->v]) }
+    % Sequencing
+    \\ \inferrule*[right=SS-Seq]
+    { \Cfg(c_0,m) \sstepsto \Cfg(c'_0,m') }
+    { \Cfg(\Seq c_0 ; c_1, m) \sstepsto \Cfg(c'_0 ; c_1, m')}
+    % Sequencing, skip elimination
+    \and \inferrule*[right=SS-Seq-Skip]
+    { }
+    { \Cfg(\Seq \Skip ; c, m) \sstepsto \Cfg(c, m) }
+    % If true
+    \and \inferrule*[right=SS-If-T]
+    { \Eval(e,m) = \True}
+    { \Cfg(\ITE e then c_1 else c_2, m) \sstepsto \Cfg(c_1, m)}
+    % If false
+    \and \inferrule*[right=SS-If-F]
+    { \Eval(e,m) = \False}
+    { \Cfg(\ITE e then c_1 else c_2, m) \sstepsto \Cfg(c_2, m)}
+    % While true
+    \and \inferrule*[right=SS-While-T]
+    { \Eval(e,m) = \True}
+    { \Cfg(\While e do c, m) \sstepsto \Cfg(\Seq c; \While e do c, m)}
+    % While false
+    \and \inferrule*[right=SS-While-F]
+    { \Eval(e,m) = \False}
+    { \Cfg(\While e do c, m) \sstepsto \Cfg(\Skip, m)}
+\end{mathpar}
+
+% \[
+%     \begin{prooftree}[center=false]
+%     \hypo{\Eval(e,m)=v}
+%     \infer1{\Cfg(\Assn x = e, m) \sstepsto \Cfg(\Skip, m)}
+%     \end{prooftree}
+%     \qquad
+%     \begin{prooftree}[center=false]
+%     \hypo{ \Gamma, A \vdash B }
+%     \infer1{ \Gamma \vdash A \to B }
+%     \end{prooftree}
+% \]
+
+
+\subsection*{Multi-step reduction}
+
+Let $\sstepstotrans$ denote the reflexive transitive closure of $\sstepsto$. In other words,
+$\Cfg(c,m) \sstepstotrans \Cfg(c',m')$ iff
+$\Cfg(c_0,m_0),\dots,\Cfg(c_k,m_k)$
+exist for $k\geq 0$ s.t.\ $\Cfg(c,m)=\Cfg(c_0,m_0)$
+and $\Cfg(c_k,m_k)=\Cfg(c',m')$
+and $\forall i \in [0,k).\ \Cfg(c_i,m_i) \sstepstotrans \Cfg(c_{i+1},m_{i+1})$.
+
+\begin{definition}
+    $c$ \emph{terminates} on $m$, denoted $\Terminate(c,m)$,
+    iff $\exists m'. \Cfg(c,m) \sstepstotrans \Cfg(\Skip,m')$.
+    $c$ \emph{diverges} on $m$, denoted $\Diverge(c,m)$,
+    iff $\neg \Terminate(c,m)$.
+\end{definition}
+
+\begin{lemma}[Sequential execution]
+    If $\Cfg(c_1; c_2, m) \sstepstotrans \Cfg(\Skip, m')$, 
+    then there exists an intermediate memory $m''$ such that
+    $\Cfg(c_1, m) \sstepstotrans \Cfg(\Skip, m'')$
+    and $\Cfg(c_2, m'') \sstepstotrans \Cfg(\Skip, m)$.
+\end{lemma}
+\begin{proof}
+    \todo{Proof by induction on length of execution.}
+\end{proof}
+
+% \subsection{Memories}
+
+\section{Proof system for unary Hoare logic}
+
+\paragraph{Hoare judgements}
+We define partial Hoare triples:
+\begin{definition}
+    Judgment $\Triple c : P => Q$ is \emph{valid}
+    for program $c$ and boolean expressions $P$ and $Q$,
+    written $\VAL \Triple c : P => Q$, if
+    $$\forall m \in \Interp P, m'.\
+    \Cfg(c,m) \sstepstotrans \Cfg(\Skip,m') \implies
+    m' \in \Interp Q.$$
+\end{definition}
+
+We write $\DER \Triple c : P => Q$ to say that
+the triple is \emph{derivable} in Hoare logic.
+
+\iffalse
+\begin{displaymath}
+\begin{array}{lcl}
+    \Triple c : P => Q
+    & \triangleq &
+    \forall m \in P, m'.\
+    \Cfg(c,m) \sstepstotrans \Cfg(\Skip,m') \implies
+    m' \in Q
+\end{array}
+\end{displaymath}
+\fi
+
+
+\paragraph{Structural rules}
+
+\begin{mathpar}
+    % Conseq
+    \inferrule*[right=HL-Csq]
+    { \VAL P \implies P' \\ 
+      \DER \Triple c : P' => Q' \\ 
+      \VAL Q' \implies Q }
+    { \DER \Triple c : P => Q }
+    % Case
+    \and 
+    \inferrule*[right=HL-Case]
+    { \VAL P \Longrightarrow e \vee \neg e \\
+        \DER \Triple c : P \wedge e => Q \\ 
+      \DER \Triple c : P \wedge \neg e => Q }
+    { \DER \Triple c : P => Q }
+    \and
+    \inferrule*[right=HL-False]
+    { }{ \DER \Triple c : \EFalse => Q }
+\end{mathpar}
+
+
+\paragraph{Symbolic execution rules}
+
+
+\begin{mathpar}
+    %\inferrule*[right=HL-Abort]
+    %{ }
+    %{ \DER \Triple \Abort : P => Q }
+    %\and
+    \inferrule*[right=HL-Skip] 
+    { }
+    { \DER \Triple \Skip : P => P }
+    \and
+    \inferrule*[right=HL-Assn]
+    { }
+    { \DER \Triple \Assn x = e : \Subst P[e/x] => P }
+    \and
+    \inferrule*[right=HL-Seq]
+    { \DER \Triple c : P => Q \\ \DER \Triple c' : Q => R }   
+    { \DER \Triple \Seq c;c' : P => R }
+    \\
+    \inferrule*[right=HL-If-T]
+    { \DER \Triple c : P \wedge e => Q }
+    { \DER \Triple \ITE e then c else c' : P \wedge e => Q }
+    \and
+    \inferrule*[right=HL-If-F]
+    { \DER \Triple c' : P \wedge \neg e => Q }
+    { \DER \Triple \ITE e then c else c' : P \wedge \neg e => Q }
+    \\
+    \inferrule*[right=HL-While-T]
+    { \DER \Triple \Seq c; \While e do c : P \wedge e => Q }
+    { \DER \Triple \While e do c : P \wedge e => Q \wedge \neg e }
+    \and
+    \inferrule*[right=HL-While-F]
+    { }
+    { \DER \Triple \While e do c : P \wedge \neg e => P \wedge \neg e }
+\end{mathpar}
+
+
+
+\noindent
+These rules are \emph{not} enough to subsume loop invariants, but with cyclic proofs they will be.
+These rules are enough to recover a branching \emph{if} rule (using \emph{case}).
+
+
+
+
+\subsection*{Local Soundness}
+
+
+\begin{lemma}
+    Each proof rule (structural and symbolic execution) are locally sound.
+    %If $\DER \Triple c : P => Q$
+    %then $\VAL \Triple c : P => Q$.
+\end{lemma}
+
+\noindent
+\emph{Proof.}
+
+\subsubsection*{\textsc{HL-Csq}}
+We show if $\VAL P \implies P'$ and 
+      $\VAL \Triple c : P' => Q'$ and 
+      $\VAL Q' \implies Q$
+then $\VAL \Triple c : P => Q$.
+% We are given that $\forall m \in P : m \in P'$
+% and that $\forall m \in Q' : m \in Q$.
+The triple we are given unfolds to
+\[
+    \forall m \in \Interp{P'}, m'.\
+    \Cfg(c, m) \sstepstotrans \Cfg(\Skip, m')
+    \implies m' \in \Interp{Q'}.
+\]
+We want to show that
+\[
+    \forall m \in \Interp P, m'.\
+    \Cfg(c, m) \sstepstotrans \Cfg(\Skip, m')
+    \implies m' \in \Interp Q.
+\]
+Note that we are also given $\Interp{P} \subseteq \Interp{P'}$ and $\Interp{Q'} \subseteq \Interp{Q}$,
+so the claim immediately follows.
+
+\subsubsection*{\textsc{HL-Case}}
+We show if $\ \VAL \Triple c : P \wedge e => Q\ $ and
+      $\ \VAL \Triple c : P \wedge \neg e => Q\ $ then
+    $\ \VAL \Triple c : P => Q$.
+Note that this rule is for Boolean expressions $e$,
+so for any memory $m$, we have that $\Eval(e,m) = \True$
+or $\Eval(e,m) = \False$.
+
+The two triples unfold to
+\[
+    \forall m \in \Interp{P \wedge e}, m'.\
+    \Cfg(c, m) \sstepstotrans \Cfg(\Skip, m') 
+    \implies m' \in Q.
+\]
+Note
+
+We are given that for any $m$. $m \in P \wedge \Eval(e,m) = \True \implies $
+\todo{todo}
+
+\subsubsection*{\textsc{HL-False}}
+We show $\VAL \Triple c : \EFalse => P$.
+This unfolds to
+\[
+    \forall m \in \Interp{\EFalse}, m'.\
+    \Cfg(c, m) \sstepstotrans \Cfg(\Skip, m') 
+    \implies m' \in \Interp{P}.
+\]
+Note that for any $m$, $m \notin \Interp{\EFalse}$,
+so this is vacuously true.
+
+\subsubsection*{\textsc{HL-Skip}}
+We show $\VAL \Triple \Skip : P => P$.
+This unfolds to 
+$$\forall m \in \Interp{P}, m'.\
+\Cfg(\Skip,m) \sstepstotrans \Cfg(\Skip,m') \implies
+m' \in \Interp{P}.$$
+$\Cfg(\Skip,m)$ steps to nothing,
+so the only possibility is $m' = m$.
+Therefore $m \in \Interp{P} \implies m' = m \in \Interp{P}$.
+
+\subsubsection*{\textsc{HL-Assn}}
+We show $\VAL \Triple \Assn x = e : \Subst P[e/x] => P$.
+\todo{todo}
+
+\subsubsection*{\textsc{HL-Seq}}
+We show if $\VAL \Triple c : P => Q$ and $\VAL \Triple c' : Q => R$
+then $\VAL \Triple \Seq c;c' : P => R$.
+\todo{todo}
+    
+\subsubsection*{\textsc{HL-If-T}}
+We show if $\VAL \Triple c : P \wedge e => Q$ then
+    $\VAL \Triple \ITE e then c else c' : P \wedge e => Q$.
+\todo{todo}
+
+\subsubsection*{\textsc{HL-If-F}}
+We show if $\VAL \Triple c' : P \wedge \neg e => Q$ then
+    $\VAL \Triple \ITE e then c else c' : P \wedge \neg e => Q$.
+\todo{todo}
+
+\subsubsection*{\textsc{HL-While-T}}
+We show if $\VAL \Triple \Seq c; \While e do c : P \wedge e => Q$ then
+    $\VAL \Triple \While e do c : P \wedge e => Q \wedge \neg e$. 
+\todo{todo}
+
+\subsubsection*{\textsc{HL-While-F}}
+We show~~$\VAL \Triple \While e do c : P \wedge \neg e => P \wedge \neg e$.
+This unfolds to
+$$\forall m \in P \wedge \neg e, m'.\
+\Cfg(\While e do c,m) \sstepstotrans \Cfg(\Skip,m') \implies
+m' \in P \wedge \neg e.$$
+
+$m \in P \wedge \neg e$, which means $\Eval(e,m) = \False$
+(or $\Eval(e,m) = \bot$, in which case the config cannot step at all and statement holds vacuously),
+so $\Cfg(\While e do c,m) \sstepsto \Cfg(\Skip,m)$ by \textsc{SS-While-F}.
+Thus $m' = m$, so $m' = m \in P \wedge \neg e$.
+
+
+\hfill $\qed$
+
+\subsection*{Unary Soundness}
+\begin{theorem}
+If $\DER \Triple c : P => Q$ then $\VAL \Triple c : P => Q$.
+\end{theorem}
+
+\noindent
+\emph{Proof.}
+
+\noindent
+We derive this result from local soundness.
+\todo{todo induction on programs?}
+\hfill $\qed$
+
+
+\newpage
+\section{Proof system for relational Hoare logic}
+
+\paragraph{Relational Hoare judgements}
+
+\begin{displaymath}
+\begin{array}{lcl}
+    \Quad c_1 ~ c_2 : P => Q
+    & \triangleq &
+    \forall (m_1,m_2) \in P.\
+    \wedge
+    \begin{cases}
+        (\exists m'_1.\ \Cfg(c_1,m_1) \sstepstotrans \Cfg(\Skip,m'_1))
+        \iff
+        (\exists m'_2.\ \Cfg(c_2,m_2) \sstepstotrans \Cfg(\Skip,m'_2))
+        \\
+        \forall m'_1, m'_2.\
+        \Cfg(c_1,m_1) \sstepstotrans \Cfg(\Skip,m'_1) \wedge
+        \Cfg(c_2,m_2) \sstepstotrans \Cfg(\Skip,m'_2) \\
+        \hspace{0.5in} \implies
+        (m'_1,m'_2) \in Q
+    \end{cases}
+\end{array}
+\end{displaymath}
+
+\paragraph{Structural rules}
+
+\begin{mathpar}
+    % Conseq
+    \inferrule*[right=Conseq]
+    { \Quad c_1 ~ c_2 : P' => Q' \\ P \implies P' \\ Q' \implies Q }
+    { \Quad c_1 ~ c_2 : P => Q }
+    % Case
+    \and \inferrule*[right=Case]
+    { \Eval(e,m) = \False}
+    { \Quad c_1 ~ c_2 : P => Q }
+\end{mathpar}
+
+
+\paragraph{One-sided rules}
+
+
+\begin{mathpar}
+    \inferrule*[right=Assn-L]
+    { \Eval(e,m) = \True \\ \Eval(e,m) = \True \\  }
+    { \Cfg(\While e do c, m) \sstepsto \Cfg(\Seq c; \While e do c, m)}
+    % While false
+    \and \inferrule*[right=If-L]
+    { \Eval(e,m) = \False}
+    { \Cfg(\While e do c, m) \sstepsto \Cfg(\Skip, m)}
+\end{mathpar}
+
+
+\section{Proof Graphs}
+
+\begin{definition}
+    A proof graph is a finite \todo{todo}
+
+    We assume proof graphs to be minimal, i.e.\ any nodes with equivalent values
+    are identical nodes in the graph.
+\end{definition}
+
+\begin{definition}
+    A proof graph is \emph{locally sound} iff every node is locally sound,
+    and every leaf $\VAL P \implies Q$ holds.
+    A node is locally sound iff \todo{todo}
+\end{definition}
+
+\begin{conjecture}
+    If $\DER \Triple c : P => Q$ is on a node of a
+    acyclic locally sound proof graph,
+    then $\VAL \Triple c : P => Q$.
+\end{conjecture}
+
+\begin{definition}
+    A simple cycle in a proof graph is a sequence of mutually distinct nodes $n_1,\dots,n_k$ for $k > 0$
+    s.t.\ $n_i$ points to $n_{i+1}$ for all $i$, and $n_k$ points to $n_1$.
+    Recall the assumption that proof graphs contain no distinct duplicate nodes.
+\end{definition}
+
+\begin{conjecture}
+    Every cyclic proof graph contains finitely many simple cycles.
+\end{conjecture}
+
+%\begin{conjecture}
+%    Every infinite path in a cyclic proof graph
+%    consists of infinite traversals of one or more simple cycles.
+%\end{conjecture}
+
+\begin{conjecture}
+    If every simple cycle in a proof graph
+    contains an instance of \textsc{HL-While-T},
+    then every infinite path in the graph
+    contains infinitely many instances of \textsc{HL-While-T}.
+\end{conjecture}
+
+\begin{conjecture}
+    Consider a locally sound proof graph,
+    for which every simple cycle contains a node
+    with \textsc{HL-While-T}.
+    If $\DER \Triple c : P => Q$ is on a node of this graph,
+    then $\VAL \Triple c : P => Q$.
+\end{conjecture}
+
+
+
+\section{Completeness}
+
+\subsection*{Invariants}
+
+We argue that cyclic proofs subsume the one- and two-sided proof rules for loop invariants.
+
+
+\begin{conjecture}
+The following rule holds:
+\begin{displaymath}
+    \inferrule*[right=Ht-while-inv]
+    { \DER \Triple c : P \wedge e => P }
+    { \DER \Triple \While e do c : P => P \wedge \neg e }
+\end{displaymath}
+\end{conjecture}
+
+\noindent
+\emph{Proof.}
+
+\noindent
+By the definition of Hoare judgements, the proof boils down to proving 
+the claim that given 
+\[
+    \forall m \in \Interp{P \wedge e}, m'.\
+    \Cfg(c, m) \sstepstotrans \Cfg(\Skip, m') 
+    \implies m' \in \Interp{P},
+\]
+it is true that 
+\[
+    \forall m \in \Interp{P}, m'.\
+    \Cfg(\While e do c, m) \sstepstotrans \Cfg(\Skip, m')
+    \implies m' \in \Interp{P \wedge \neg e}.
+\]
+
+We will prove this by induction on the length of the sequence of program-memory pairs that witnesses 
+the multi-step reduction in this statement. Note that since $(\While e do c) \neq \Skip$, 
+this sequence will always have length at least 1.
+
+Our inductive hypothesis, parametrized by a positive integer $k$ is that, 
+for any $m, m'$ where $m \in \Interp{P}$ such that 
+$\Cfg(\While e do c, m) \sstepstotrans \Cfg(\Skip, m')$ in $k$ steps, 
+we have $m' \in \Interp{P \wedge \neg e}$.
+More precisely:
+\begin{align*}
+    \forall m \in \Interp{P}, m'. 
+    \bigl(\exists &\Cfg(c_0, m_0), \Cfg(c_1, m_1), \ldots, \Cfg(c_k, m_k). \\
+     &\Cfg(c_0, m_0) = \Cfg(\While e do c, m)
+     \wedge \Cfg(c_k, m_k) = \Cfg(\Skip, m') 
+     \wedge \forall i \in \{0, \ldots, i-1\}. \Cfg(c_i, m_i) \sstepsto \Cfg(c_{i+1}, m_{i+1}) 
+     \bigr) \\
+    &\implies m' \in \Interp{P \wedge \neg e}.
+\end{align*}
+
+\subsubsection*{Base case} ($k = 1$)
+
+\noindent
+If $\Cfg(\While e do c, m) \sstepsto \Cfg(\Skip, m')$, the only small-step operation semantics rule 
+that could apply is \textsc{SS-While-F}.
+Thereby, it must be that $m' = m$ and $\Eval(e, m) = \False$ (i.e. $m \in \Interp{\neg e}$).
+Recall that we also have that $m \in \Interp{P}$ by assumption.
+We can then conclude that $m' \in \Interp{P \wedge \neg e}$.
+
+\subsubsection*{Inductive step}\
+
+\noindent
+Suppose $m \in \Interp{P}$ and that $\Cfg(\While e do c, m) \sstepstotrans \Cfg(\Skip, m')$ in $k$ steps.
+The two small-step operation semantics rule that apply are \textsc{SS-While-T} and \textsc{SS-While-F}.
+Since we are necessarily taking a step, it must be the case that $\Eval(e, m) \in \{\True, \False\}$.
+
+In the case that $\Eval(e, m) = \False$, we step to $\Cfg(\Skip, m)$ and cannot step any further.
+Hence, we have that $m' = m$, and the base case applies.
+
+% https://www.lri.fr/~marche/MPRI-2-36-1/2012/poly-chap2.pdf
+In the case that $\Eval(e, m) = \True$, \todo{recourse to sequential execution lemma; take the \textsc{SS-While-T} step and apply the lemma.}
+
+
+% we step to some configuration $\Cfg(c_1, m_1)$; 
+% which, in turn, steps to $\Cfg(\Skip, m')$ in $k-1$ steps.
+
+% \subsubsection*{\textsc{HL-Csq}}
+% We show if $\VAL P \implies P'$ and 
+%       $\VAL \Triple c : P' => Q'$ and 
+%       $\VAL Q' \implies Q$
+% then $\VAL \Triple c : P => Q$.
+% % We are given that $\forall m \in P : m \in P'$
+% % and that $\forall m \in Q' : m \in Q$.
+% The triple we are given unfolds to
+% \[
+%     \forall m \in \Interp{P'}, m'.\
+%     \Cfg(c, m) \sstepstotrans \Cfg(\Skip, m')
+%     \implies m' \in \Interp{Q'}.
+% \]
+% We want to show that
+% \[
+%     \forall m \in \Interp P, m'.\
+%     \Cfg(c, m) \sstepstotrans \Cfg(\Skip, m')
+%     \implies m' \in \Interp Q.
+% \]
+% Note that we are also given $\Interp{P} \subseteq \Interp{P'}$ and $\Interp{Q'} \subseteq \Interp{Q}$,
+% so the claim immediately follows.
+
+
+\newpage
+\input{holding}
+
+
+\end{document}

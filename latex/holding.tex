@@ -1,0 +1,59 @@
+\section{Holding Area}
+
+
+\paragraph{Symbolic execution rules}
+
+
+\begin{mathpar}
+    %\inferrule*[right=HL-Abort]
+    %{ }
+    %{ \DER \Triple \Abort : P => Q }
+    %\and
+    \inferrule*[right=HL-Skip \todo{Is this okay?}] 
+    { \VAL P \implies Q }
+    { \DER \Triple \Skip : P => Q }
+    \and
+    \inferrule*[right=HL-Assn]
+    { \VAL P \implies Q }
+    { \DER \Triple \Assn x = e : \Subst P[e/x] => Q }
+    \and
+    \inferrule*[right=HL-Seq]
+    { \DER \Triple c : P => Q \\ \DER \Triple c' : Q => R }   
+    { \DER \Triple \Seq c;c' : P => R }
+    \\
+    \inferrule*[right=HL-If-T]
+    { \VAL P \implies e \\ \DER \Triple c : P => Q }
+    { \DER \Triple \ITE e then c else c' : P => Q }
+    \and
+    \inferrule*[right=HL-If-F]
+    { \VAL P \implies \neg e \\ \DER \Triple c' : P => Q }
+    { \DER \Triple \ITE e then c else c' : P => Q }
+    \\
+    \inferrule*[right=HL-While-T]
+    { \VAL P \implies e \\ \DER \Triple \Seq c; \While e do c : P => Q }
+    { \DER \Triple \While e do c : P => Q }
+    \and
+    \inferrule*[right=HL-While-F]
+    { \VAL P \implies Q \wedge \neg e}
+    { \DER \Triple \While e do c : P => Q }
+\end{mathpar}
+
+
+
+we show if $\VAL P \implies Q$
+then $\VAL \Triple \Skip : P => Q$.
+The latter unfolds to
+$\forall m \in P, m'.\
+\Cfg(\Skip,m) \sstepstotrans \Cfg(\Skip,m') \implies
+m' \in Q.$ The only option is $m = m'$,
+so we need $m \in P \implies m \in Q$,
+which is exactly our assumption $\VAL P \implies Q$.
+
+
+
+
+\begin{lemma}
+    Determinism: if $\Cfg(c,m) \sstepstotrans \Cfg(\Skip,m')$
+    and $\Cfg(c,m) \sstepstotrans \Cfg(\Skip,m'')$,
+    then $m'=m''$. \todo{(This may not be needed at all)}
+\end{lemma}
