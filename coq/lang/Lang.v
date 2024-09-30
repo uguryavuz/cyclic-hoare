@@ -7,6 +7,7 @@ From Lang Require Import Util.
 Open Scope fmap_scope.
 
 
+
 Section Language.
 
 Notation varid := string.
@@ -337,8 +338,11 @@ Section Interp.
 
 Definition interp (P : bexp) : [mem] :=
   fun m =>
-  evalbexp m P = Some (VBool true).
-
+  match evalbexp m P with
+  | Some (VBool true) => True
+  | None => True
+  | _ => False
+  end.
 
 Notation "'[[' P ']]'" := (interp P).
 
@@ -355,6 +359,7 @@ Proof using.
   destruct evalexp. destruct v; try easy.
   all: destruct evalexp. all: try destruct v; try easy.
   destruct b, b0; simpls~; easy.
+  splits; intros; try easy. splits; intros; try easy.
 Qed.
 
 
