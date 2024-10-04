@@ -8,13 +8,64 @@ Open Scope fmap_scope.
 
 
 
-Section Language.
+Section Memory.
 
 Notation varid := string.
 
-
 Definition mem := varid -> int.
 Implicit Type m : mem.
+
+
+Definition upd m x n : mem :=
+  fun x' => If x = x' then n else m x'.
+
+
+Lemma upd_shadow1 m x n n' :
+  upd (upd m x n) x n' = upd m x n'.
+Proof using.
+  unfolds upd. extensionality x'.
+  case_if~.
+Qed.
+
+Lemma upd_shadow2 m x y k n n' :
+  upd (upd (upd m x n) y k) x n' = upd (upd m y k) x n'.
+Proof using.
+  unfold upd. extensionality x'.
+  case_if~.
+Qed.
+
+Lemma upd_swap_diff m x x' n n' :
+  x <> x' ->
+  upd (upd m x n) x' n' = upd (upd m x' n') x n.
+Proof using.
+  intros.
+  extensionality x''.
+  unfolds. case_if~.
+  case_if~.
+Qed.
+
+Lemma upd_read1 m x n :
+  (upd m x n) x = n.
+Proof using.
+  unfolds. case_if~.
+Qed.
+
+Lemma upd_read2 m x x' n n' :
+  x <> x' ->
+  upd (upd m x n) x' n' x = n.
+Proof using.
+  intros.
+  unfolds. case_if~. case_if~.
+Qed.
+
+
+
+
+End Memory.
+Notation varid := string.
+
+
+Section Language.
 
 Inductive aexp :=
 | AVal (n:int)
@@ -91,7 +142,7 @@ Inductive cstep : cmd -> mem -> cmd -> mem -> Prop :=
   (Hg : ~ beval m b)
   : cstep (CWhile b c) m CSkip m
 | StepAssn m x a
-  : cstep (CAssn x a) m CSkip (fun x' => If x = x' then aeval m a else m x')
+  : cstep (CAssn x a) m CSkip (upd m x (aeval m a))
 .
 
 
@@ -304,3 +355,84 @@ Qed.
 
 
 End Valid.
+
+
+Section Example.
+
+
+Local Definition c1 : cmd :=
+  CAssn "x" (AMul (AVal 5) (AVal 10)).
+
+Local Lemma ex1_eval m :
+  yields c1 m (upd m "x" 50).
+Proof.
+  unfolds. exists.
+  repeat econstructor.
+Qed.
+
+Notation "c1 ;; c2" := (CSeq c1 c2) (at level 39, right associativity).
+
+Notation "x @@ z w" := (x (z w)) (at level 38, right associativity, only parsing).
+
+Notation "# n" := (AVal n) (at level 5).
+
+Local Definition c2 : cmd :=
+  CAssn "x" #1 ;;
+  CAssn "i" #3 ;;
+  CWhile (BLt #0 (AVar "i"))
+  (CAssn "x" (AMul (AVar "x") #2);;
+   CAssn "i" (ASub (AVar "i") #1)).
+
+Local Lemma ex2_eval m :
+  yields c2 m (upd (upd m "x" 8) "i" 0).
+Proof.
+  econstructor.
+  econstructor. econstructor. econstructor.
+  simpls. econstructor.
+  apply StepSeqSkip. econstructor.
+  econstructor. econstructor.
+  econstructor. apply StepSeqSkip.
+  econstructor. econstructor.
+  simpls. unfolds upd. case_if.
+  constructor. simpls.
+  econstructor. repeat econstructor.
+  econstructor. econstructor.
+  apply StepSeqSkip. econstructor.
+  econstructor. econstructor.
+  do 2 rewrite upd_shadow2.
+  econstructor. apply StepSeqSkip.
+  econstructor. econstructor.
+  simpls. unfold upd. repeat case_if.
+  constructor. simpls.
+  rewrite upd_shadow1.
+  do 2 (rewrite upd_read2; [|discriminate]).
+  econstructor. econstructor.
+  econstructor. econstructor.
+  econstructor. econstructor.
+  apply StepSeqSkip. econstructor.
+  econstructor. econstructor.
+  simpls.
+  do 2 (rewrite upd_read2; [|discriminate]).
+  rewrite upd_shadow2. rewrite upd_shadow1.
+  econstructor. apply StepSeqSkip.
+  econstructor. econstructor.
+  simpls. rewrite upd_read1. constructor.
+  econstructor. econstructor.
+  econstructor. econstructor.
+  econstructor. econstructor.
+  apply StepSeqSkip. econstructor.
+  econstructor. econstructor.
+  simpls. 
+  do 2 (rewrite upd_read2; [|discriminate]).
+  rewrite upd_shadow2.
+  rewrite upd_shadow1.
+  econstructor. apply StepSeqSkip.
+  econstructor.
+  apply StepWhileFalse.
+  intro. inverts H.
+  rewrite upd_read1 in H1.
+  inverts H1.
+  econstructor.
+Qed.
+
+End Example.
