@@ -83,3 +83,18 @@
 \newcommand{\todo}[1]{{\color{red}#1}}
 
 \newcommand*{\set}[1]{\left\{#1\right\}}
+
+\renewcommand*{\complement}[1]{\overline{#1}}
+
+
+
+
+\newcommand*{\biimp}[2]{%
+	\hbox{%
+		\ooalign{%
+			$\genfrac{}{}{1.6pt}1{#1}{#2}$\cr%
+			$\color{white}\genfrac{}{}{0.8pt}1{\phantom{#1}}{\phantom{#2}}$%
+		}%
+	}%
+}
+\newcommand{\BIIMP}{\mprset{myfraction=\biimp}}

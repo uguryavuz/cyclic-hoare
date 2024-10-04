@@ -66,12 +66,12 @@ are total maps from variables (\domvar) to integers.
 We define the \emph{evaluation} of an expression $e$
 w.r.t.\ a memory $m$, denoted $\Eval(e,m)$,
 to yield exactly one value $v \in \Vals$.
-
+%
 {
 \newcommand{\LINE}[2]{
     \Eval(#1,m) &\triangleq& #2 \\
 }
-
+%
 \begin{mathpar}
 \begin{array}{rcl}
 \LINE x {m(x)}
@@ -115,51 +115,133 @@ to yield exactly one value $v \in \Vals$.
 %$\forall m.\ \Eval(P,m) \in \set{\True,\False,\bot}$.
 %Call this family of expressions $\BoolExps$.
 %
-We define the \emph{interpretation} of $P,Q \in \DomBexp$
-to yield the subset of memories
-in which the expression holds:
-$\Interp P \triangleq \SetBuild(m | {\Eval(P,m) = \True})$.
-Properties of interpretation include (all proven in Coq):
 
+% \[
+%     \begin{prooftree}[center=false]
+%     \hypo{\Eval(e,m)=v}
+%     \infer1{\Cfg(\Assn x = e, m) \sstepsto \Cfg(\Skip, m)}
+%     \end{prooftree}
+%     \qquad
+%     \begin{prooftree}[center=false]
+%     \hypo{ \Gamma, A \vdash B }
+%     \infer1{ \Gamma \vdash A \to B }
+%     \end{prooftree}
+% \]
+
+
+\subsection*{Multi-step reduction}
+
+Let $\sstepstotrans$ denote the reflexive transitive closure of $\sstepsto$. Namely,
+$\Cfg(c,m) \sstepstotrans \Cfg(c',m')$ iff
+for $k\geq 0$ there exist
+$\Cfg(c_0,m_0),\dots,\Cfg(c_k,m_k)$
+s.t.\ $\Cfg(c,m)=\Cfg(c_0,m_0)$,
+$\Cfg(c_k,m_k)=\Cfg(c',m')$,
+and $\forall i \in [0,k).\ \Cfg(c_i,m_i) \sstepsto \Cfg(c_{i+1},m_{i+1})$.
+
+\begin{definition}
+    $c$ \emph{terminates} on $m$, denoted $\Terminate(c,m)$,
+    iff $\exists m'. \Cfg(c,m) \sstepstotrans \Cfg(\Skip,m')$.
+    $c$ \emph{diverges} on $m$, denoted $\Diverge(c,m)$,
+    iff $\neg \Terminate(c,m)$.
+\end{definition}
+
+\begin{lemma}[Sequential execution]
+    If $\Cfg(c_1; c_2, m) \sstepstotrans \Cfg(\Skip, m'')$, 
+    then there exists an intermediate memory $m'$ such that
+    $\Cfg(c_1, m) \sstepstotrans \Cfg(\Skip, m')$
+    and $\Cfg(c_2, m') \sstepstotrans \Cfg(\Skip, m'')$.
+\end{lemma}
+\begin{proof}
+    By induction on length of execution. See Coq proof.
+\end{proof}
+
+% \subsection{Memories}
+
+\section{Assertions}
+
+\newcommand*{\domivar}{\mathsf{IVar}}
+
+\newcommand*{\DomAssert}{\mathsf{Assrt}}
+\newcommand*{\DomAexpv}{\mathsf{Aexpv}}
+
+We define boolean assertions as an extension
+on boolean expressions.
+These allow for quantification over
+integer variables.
 \begin{displaymath}
-\begin{array}{rcl}
-\Interp{\neg P} & = & \SetBuild(m | {\Eval(P,m) = \False}) \\
-\Interp{P \wedge Q} & = & \Interp{P} \cap \Interp{Q} \\
-\Interp{P \vee Q} & = & (\Interp{P} \cup \Interp{Q}) \cap \Support P \cap \Support Q \\
-\Interp{P \Rightarrow Q} & = & \Interp{\neg P \vee Q} \\
-\Interp{\ETrue} & = & \Mems  \\
-\Interp{\EFalse} & = & \emptyset \\
+\begin{array}{lrcl}
+    & i & \in  & \domivar \\
+    \DomAexpv & a & \bnf & x \ALT n \ALT i \ALT a + a \ALT a - a \ALT a \times a \\
+    \DomAssert & b & \bnf & \True \ALT \False \ALT 
+        \neg b \ALT b \wedge b \ALT b \vee b \ALT b \Longrightarrow b \\\
+    && \ALT & a = a \ALT b = b \ALT a < a \ALT a \leq a \\
+    && \ALT & \forall i.\, b \ALT \exists i.\, b
 \end{array}
 \end{displaymath}
+where $i$ are bound integer variables.
+
+We define the \emph{interpretation} of $P,Q \in \DomAssert$
+to yield the subset of memories
+in which the assertion holds:
+$\Interp P \triangleq \SetBuild(m | {\Eval(P,m) = \True})$.
+Properties of interpretation include (all proven in Coq):
+%
+\begin{mathpar}
+\begin{array}{rcl}
+\Interp{\neg P} & = & \complement{\Interp{P}} \\
+\Interp{P \wedge Q} & = & \Interp{P} \cap \Interp{Q} \\
+\Interp{P \vee Q} & = & \Interp{P} \cup \Interp{Q}
+\end{array}
+\and
+\begin{array}{rcl}
+\Interp{P \Rightarrow Q} & = & \complement{\Interp P} \cup \Interp{Q} \\
+\Interp{\ETrue} & = & \Mems  \\
+\Interp{\EFalse} & = & \emptyset
+\end{array}
+\end{mathpar}
 
 A boolean expression is \emph{valid},
 denoted $\VAL P$,
-iff $\Support P = \Interp P$.
-In other words, whenever $P$ evaluates,
-it yields $\True$.
+if $P$ always yields $\True$,
+i.e.\ $\Interp P = \Mems$.
 Properties include:
 {
-
+%
 \newcommand*{\LINE}[3]{%
-    \VAL #1 & \text{#3} & #2 \\
+    \VAL #1 & \text{#3} & #2 \\ %
 }
-
-%\begin{mathpar}
-%    \inferrule{
-%        \VAL P \\ \VAL Q
-%    }{
-%    \VAL P \wedge Q
-%    }
-%\end{mathpar}
-
-\begin{displaymath}
-\begin{array}{rcl}
-\LINE {P \wedge Q}{\VAL P \text{ and } \VAL Q}{iff}
-\LINE {P \Rightarrow Q}{\Interp P \subseteq \Interp Q}{iff}
-\LINE {P \vee Q}{\VAL P \text{ or } \VAL Q}{if}
-\end{array}
-\end{displaymath}
-
+%
+\begin{mathpar}
+{\BIIMP\inferrule*[right=Val-$\wedge$]{
+    \VAL P \\ \VAL Q
+}{
+    \VAL P \wedge Q
+}}
+%
+\and
+%
+\inferrule*[right=Val-$\vee_\textsc{L}$]{
+    \VAL P
+}{
+    \VAL P \vee Q
+}
+%
+\and
+%
+\inferrule*[right=Val-$\vee_\textsc{R}$]{
+    \VAL Q
+}{
+    \VAL P \vee Q
+}
+%
+\and
+{\BIIMP\inferrule*[right=Val-$\Rightarrow$]{
+    \Interp P \subseteq \Interp Q
+}{
+    \VAL P \Rightarrow Q
+}}
+\end{mathpar}
 }
 
 
@@ -196,46 +278,6 @@ Properties include:
     { \Cfg(\While b do c, m) \sstepsto \Cfg(\Skip, m)}
 \end{mathpar}
 
-% \[
-%     \begin{prooftree}[center=false]
-%     \hypo{\Eval(e,m)=v}
-%     \infer1{\Cfg(\Assn x = e, m) \sstepsto \Cfg(\Skip, m)}
-%     \end{prooftree}
-%     \qquad
-%     \begin{prooftree}[center=false]
-%     \hypo{ \Gamma, A \vdash B }
-%     \infer1{ \Gamma \vdash A \to B }
-%     \end{prooftree}
-% \]
-
-
-\subsection*{Multi-step reduction}
-
-Let $\sstepstotrans$ denote the reflexive transitive closure of $\sstepsto$. In other words,
-$\Cfg(c,m) \sstepstotrans \Cfg(c',m')$ iff
-$\Cfg(c_0,m_0),\dots,\Cfg(c_k,m_k)$
-exist for $k\geq 0$ s.t.\ $\Cfg(c,m)=\Cfg(c_0,m_0)$
-and $\Cfg(c_k,m_k)=\Cfg(c',m')$
-and $\forall i \in [0,k).\ \Cfg(c_i,m_i) \sstepstotrans \Cfg(c_{i+1},m_{i+1})$.
-
-\begin{definition}
-    $c$ \emph{terminates} on $m$, denoted $\Terminate(c,m)$,
-    iff $\exists m'. \Cfg(c,m) \sstepstotrans \Cfg(\Skip,m')$.
-    $c$ \emph{diverges} on $m$, denoted $\Diverge(c,m)$,
-    iff $\neg \Terminate(c,m)$.
-\end{definition}
-
-\begin{lemma}[Sequential execution]
-    If $\Cfg(c_1; c_2, m) \sstepstotrans \Cfg(\Skip, m')$, 
-    then there exists an intermediate memory $m''$ such that
-    $\Cfg(c_1, m) \sstepstotrans \Cfg(\Skip, m'')$
-    and $\Cfg(c_2, m'') \sstepstotrans \Cfg(\Skip, m')$.
-\end{lemma}
-\begin{proof}
-    Proof by induction on length of execution. See Coq proof.
-\end{proof}
-
-% \subsection{Memories}
 
 \section{Proof system for unary Hoare logic}
 
