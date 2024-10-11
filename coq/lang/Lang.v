@@ -10,6 +10,8 @@ Open Scope fmap_scope.
 
 Section Memory.
 
+
+
 Notation varid := string.
 
 Definition mem := varid -> int.
@@ -600,6 +602,100 @@ Proof using.
 Qed.
 
 End Assertions.
+
+Notation "m ',' I '|=' P" := (sat m I P) (at level 50).
+
+
+Section SatRules.
+
+Lemma sat_true m I :
+  m,I |= AssrtVal true.
+Proof using.
+  easy.
+Qed.
+
+Lemma sat_neg m I P :
+  ~ m,I |= P ->
+  m,I |= AssrtNot P.
+Proof using.
+  now simpls.
+Qed.
+
+Lemma sat_and m I P1 P2 :
+  m,I |= P1 ->
+  m,I |= P2 ->
+  m,I |= AssrtAnd P1 P2.
+Proof using.
+  simpls. auto.
+Qed.
+
+Lemma sat_or_l m I P1 P2 :
+  m,I |= P1 ->
+  m,I |= AssrtOr P1 P2.
+Proof using.
+  simpls. auto.
+Qed.
+
+Lemma sat_or_r m I P1 P2 :
+  m,I |= P2 ->
+  m,I |= AssrtOr P1 P2.
+Proof using.
+  simpls. auto.
+Qed.
+
+Lemma sat_imp m I P1 P2 :
+  (m,I |= P1 -> m,I |= P2) ->
+  m,I |= AssrtImp P1 P2.
+Proof using.
+  simpls. auto.
+Qed.
+
+Lemma sat_forall m i I P :
+  (forall n, m, iupd I i n |= P) ->
+  m,I |= AssrtForall i P.
+Proof using.
+  simpls. auto.
+Qed.
+
+Lemma sat_exists m i n I P :
+  m,iupd I i n |= P ->
+  m,I |= AssrtExists i P.
+Proof using.
+  simpls. intro. exists. apply H.
+Qed.
+
+Lemma sat_eqa m I a1 a2 :
+  aveval m I a1 = aveval m I a2 ->
+  m,I |= AssrtEqA a1 a2.
+Proof using.
+  simpls. auto.
+Qed.
+
+Lemma sat_eqb m I P Q :
+  (m,I |= P <-> m,I |= Q) ->
+  m,I |= AssrtEqB P Q.
+Proof using.
+  simpls. apply prop_ext.
+Qed.
+
+Lemma sat_lt m I a1 a2 :
+  aveval m I a1 < aveval m I a2 ->
+  m,I |= AssrtLt a1 a2.
+Proof using.
+  simpls. auto.
+Qed.
+
+Lemma sat_leq m I a1 a2 :
+  aveval m I a1 <= aveval m I a2 ->
+  m,I |= AssrtLeq a1 a2.
+Proof using.
+  simpls. auto.
+Qed.
+
+End SatRules.
+
+
+
 
 Section Interp.
 
