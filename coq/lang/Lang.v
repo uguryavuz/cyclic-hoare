@@ -601,6 +601,31 @@ Proof using.
         rewrite iupd_swap_diff; auto.
 Qed.
 
+(* Winskel Ex6.6 *)
+Corollary assrt_isubst_forall_equiv m I i P :
+  sat m I (AssrtForall i P) <->
+  forall n H, sat m I (assrt_isubst i (AvVal n) H P).
+Proof using.
+  simpls. split; intros.
+  - apply assrt_isubst_equiv. apply H.
+  - specializes H n. specializes~ H.
+    apply assrt_isubst_equiv in H.
+    apply H. Unshelve. auto.
+Qed.
+
+(* Winskel Ex6.6 *)
+Corollary assrt_isubst_exists_equiv m I i P :
+  sat m I (AssrtExists i P) <->
+  exists n H, sat m I (assrt_isubst i (AvVal n) H P).
+Proof using.
+  simpls. splits; intros.
+  - destruct H. rewrite <- assrt_isubst_equiv in H.
+    exists x. exists. apply H.
+    Unshelve. auto.
+  - exists* H. apply assrt_isubst_equiv in H.
+    exists. apply H.
+Qed.
+
 End Assertions.
 
 Notation "m ',' I '|=' P" := (sat m I P) (at level 50).
