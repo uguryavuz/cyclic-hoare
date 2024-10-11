@@ -1718,3 +1718,82 @@ Proof using.
   intro. applys disjoint_inv_not_indom_both. apply H0.
   apply H. auto.
 Qed.
+
+
+
+Section TMap.
+
+Variable A B : Type.
+
+Definition tmap : Type := A -> B.
+
+Implicit Type a : A.
+Implicit Type b : B.
+Implicit Type m : tmap.
+
+Definition upd m a b :=
+  fun a' => If a = a' then b else m a'.
+
+Notation "m '[' a '=' b ']'" := (upd m a b) 
+  (left associativity, at level 10, a at level 5, b at level 5).
+
+(*Notation "m '[' a1 '=' b1 ',' a2 '=' b2 ',' a3 '=' b3 ']'" := 
+  (m[a1=b1][a2=b2][a3=b3])
+  (left associativity, at level 10).*)
+
+Lemma upd_shadow1 m (a:A) (b b':B) :
+  m[a=b][a=b'] = m[a=b'].
+Proof using.
+  unfolds upd. extensionality x'.
+  case_if~.
+Qed.
+
+Lemma upd_shadow2 m a a' c b b' :
+  m[a=b][a'=c][a=b'] = m[a'=c][a=b'].
+Proof using.
+  unfold upd. extensionality x'.
+  case_if~.
+Qed.
+
+Lemma upd_swap_diff m a a' b b' :
+  a <> a' ->
+  m[a=b][a'=b'] = m[a'=b'][a=b].
+Proof using.
+  intros.
+  extensionality x''.
+  unfolds. case_if~.
+  case_if~.
+Qed.
+
+Lemma upd_read1 m a b :
+  m[a=b] a = b.
+Proof using.
+  unfolds. case_if~.
+Qed.
+
+Lemma upd_read2 m a a' b b' :
+  a <> a' ->
+  m[a=b][a'=b'] a = b.
+Proof using.
+  intros.
+  unfolds. case_if~. case_if~.
+Qed.
+
+
+End TMap.
+
+
+Notation "m '[' a '=' b ']'" := (upd m a b) 
+  (left associativity, at level 10, a at level 5, b at level 5).
+
+
+(*Ltac simpl_tmap :=
+  progress
+  repeat match goal with
+  | [ |- context[(?m[?a=(?b)][?a=(?b')])] ] =>
+    rewrite upd_shadow1
+  | [ H : context[(?m[?a=(?b)][?a=(?b')])] |- _ ] =>
+    rewrite upd_shadow1 in H
+  | [ |- context[(?m[?a=(?b)][][?a=(?b')])] ] =>
+    rewrite upd_shadow1
+  end.*)

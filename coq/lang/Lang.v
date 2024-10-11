@@ -7,65 +7,11 @@ From Lang Require Import Util.
 Open Scope fmap_scope.
 
 
+Definition varid := string.
 
-Section Memory.
-
-
-
-Notation varid := string.
-
-Definition mem := varid -> int.
+Definition mem := tmap varid int.
 Implicit Type m : mem.
 
-
-Definition upd m x n : mem :=
-  fun x' => If x = x' then n else m x'.
-
-
-Lemma upd_shadow1 m x n n' :
-  upd (upd m x n) x n' = upd m x n'.
-Proof using.
-  unfolds upd. extensionality x'.
-  case_if~.
-Qed.
-
-Lemma upd_shadow2 m x y k n n' :
-  upd (upd (upd m x n) y k) x n' = upd (upd m y k) x n'.
-Proof using.
-  unfold upd. extensionality x'.
-  case_if~.
-Qed.
-
-Lemma upd_swap_diff m x x' n n' :
-  x <> x' ->
-  upd (upd m x n) x' n' = upd (upd m x' n') x n.
-Proof using.
-  intros.
-  extensionality x''.
-  unfolds. case_if~.
-  case_if~.
-Qed.
-
-Lemma upd_read1 m x n :
-  (upd m x n) x = n.
-Proof using.
-  unfolds. case_if~.
-Qed.
-
-Lemma upd_read2 m x x' n n' :
-  x <> x' ->
-  upd (upd m x n) x' n' x = n.
-Proof using.
-  intros.
-  unfolds. case_if~. case_if~.
-Qed.
-
-
-
-
-End Memory.
-Notation varid := string.
-Implicit Type m : mem.
 
 
 Section Language.
@@ -145,7 +91,7 @@ Inductive cstep : cmd -> mem -> cmd -> mem -> Prop :=
   (Hg : ~ beval m b)
   : cstep (CWhile b c) m CSkip m
 | StepAssn m x a
-  : cstep (CAssn x a) m CSkip (upd m x (aeval m a))
+  : cstep (CAssn x a) m CSkip (m[x=(aeval m a)])
 .
 
 
@@ -216,62 +162,11 @@ Ltac empty_inhab_false :=
   end.
 
 
-
-Section Binding.
-
-Notation ivarid := string.
+Definition ivarid := string.
 Inductive ivar : Type :=
-| IVar (i : ivarid)
-.
+| IVar (i : ivarid).
 
-Definition binding := ivar -> int.
-Implicit Type I : binding.
-
-
-Definition iupd I i n : binding :=
-  fun i' => If i = i' then n else I i'.
-
-
-Lemma iupd_shadow1 I i n n' :
-  iupd (iupd I i n) i n' = iupd I i n'.
-Proof using.
-  unfolds iupd. extensionality x'.
-  case_if~.
-Qed.
-
-Lemma iupd_shadow2 I i j k n n' :
-  iupd (iupd (iupd I i n) j k) i n' = iupd (iupd I j k) i n'.
-Proof using.
-  unfold iupd. extensionality x'.
-  case_if~.
-Qed.
-
-Lemma iupd_swap_diff I i i' n n' :
-  i <> i' ->
-  iupd (iupd I i n) i' n' = iupd (iupd I i' n') i n.
-Proof using.
-  intros.
-  extensionality i''.
-  unfolds. case_if~.
-  case_if~.
-Qed.
-
-Lemma iupd_read1 I i n :
-  (iupd I i n) i = n.
-Proof using.
-  unfolds. case_if~.
-Qed.
-
-Lemma iupd_read2 I i i' n n' :
-  i <> i' ->
-  iupd (iupd I i n) i' n' i = n.
-Proof using.
-  intros.
-  unfolds. case_if~. case_if~.
-Qed.
-
-End Binding.
-Notation ivarid := string.
+Definition binding := tmap ivar int.
 Implicit Type I : binding.
 
 Section Assertions.
@@ -324,8 +219,8 @@ Fixpoint sat m I P : Prop :=
   | AssrtEqA a1 a2 => aveval m I a1 = aveval m I a2
   | AssrtLt a1 a2 => aveval m I a1 < aveval m I a2
   | AssrtLeq a1 a2 => aveval m I a1 <= aveval m I a2
-  | AssrtForall i P => forall n, sat m (iupd I i n) P
-  | AssrtExists i P => exists n, sat m (iupd I i n) P
+  | AssrtForall i P => forall n, sat m (I[i=n]) P
+  | AssrtExists i P => exists n, sat m (I[i=n]) P
   end.
 
 Notation "m ',' I '|=' P" := (sat m I P) (at level 50).
@@ -478,7 +373,7 @@ Definition assrt_isubst (i : ivar) (a : aexpv) (H : ~ has_ivars a) : assrt -> as
     end.
 
 Lemma aexpv_subst_equiv m I x a n : 
-  aveval m I (aexpv_subst x (AvVal n) a) = aveval (upd m x n) I a.
+  aveval m I (aexpv_subst x (AvVal n) a) = aveval (m[x=n]) I a.
 Proof using.
   induction a; simpls; auto; try math.
   + case_if; simpls.
@@ -487,16 +382,16 @@ Proof using.
 Qed.
 
 Lemma aexpv_isubst_equiv m I i a n : 
-  aveval m I (aexpv_isubst i (AvVal n) a) = aveval m (iupd I i n) a.
+  aveval m I (aexpv_isubst i (AvVal n) a) = aveval m (I[i=n]) a.
 Proof using.
   induction a; simpls; auto; try math.
   + case_if; simpls.
-    * subst. rewrite iupd_read1. trivial.
-    * unfold iupd. case_if. trivial.
+    * subst. rewrite upd_read1. trivial.
+    * unfold upd. case_if. trivial.
 Qed.
 
 Lemma assrt_subst_equiv m I x n P H :
-  sat m I (assrt_subst x (AvVal n) H P) <-> sat (upd m x n) I P.
+  sat m I (assrt_subst x (AvVal n) H P) <-> sat (m[x=n]) I P.
 Proof using.
   generalize dependent n. 
   generalize dependent I. 
@@ -542,7 +437,7 @@ Proof using.
 Qed.
 
 Lemma assrt_isubst_equiv m I i n P H :
-  sat m I (assrt_isubst i (AvVal n) H P) <-> sat m (iupd I i n) P.
+  sat m I (assrt_isubst i (AvVal n) H P) <-> sat m (I[i=n]) P.
 Proof using.
   generalize dependent n. 
   generalize dependent I. 
@@ -572,33 +467,33 @@ Proof using.
   - intros. split.
     + intros. case_if.
       * subst.
-        rewrite iupd_shadow1.
+        rewrite upd_shadow1.
         apply H0.
-      * rewrite iupd_swap_diff; auto.
+      * rewrite upd_swap_diff; auto.
         eapply IHP.
         apply H0.
     + intros. case_if.
       * subst.
-        erewrite <- iupd_shadow1.
+        erewrite <- upd_shadow1.
         apply H0.
       * eapply IHP.
-        rewrite iupd_swap_diff; auto.
+        rewrite upd_swap_diff; auto.
   - intros. split.
     + intros (?&?). case_if.
       * subst.
         exists x.
-        now rewrite iupd_shadow1.
+        now rewrite upd_shadow1.
       * exists x.
-        rewrite iupd_swap_diff; auto.
+        rewrite upd_swap_diff; auto.
         eapply IHP.
         apply H0.
     + intros (?&?). case_if.
       * subst. 
         exists x. 
-        now rewrite iupd_shadow1 in H0.
+        now rewrite upd_shadow1 in H0.
       * exists x.
         eapply IHP.
-        rewrite iupd_swap_diff; auto.
+        rewrite upd_swap_diff; auto.
 Qed.
 
 (* Winskel Ex6.6 *)
@@ -676,14 +571,14 @@ Proof using.
 Qed.
 
 Lemma sat_forall m i I P :
-  (forall n, m, iupd I i n |= P) ->
+  (forall n, m, I[i=n] |= P) ->
   m,I |= AssrtForall i P.
 Proof using.
   simpls. auto.
 Qed.
 
 Lemma sat_exists m i n I P :
-  m,iupd I i n |= P ->
+  m,I[i=n] |= P ->
   m,I |= AssrtExists i P.
 Proof using.
   simpls. intro. exists. apply H.
@@ -872,7 +767,7 @@ Local Definition c1 : cmd :=
   CAssn "x" (AMul (AVal 5) (AVal 10)).
 
 Local Lemma ex1_eval m :
-  yields c1 m (upd m "x" 50).
+  yields c1 m (m["x"=50]).
 Proof.
   unfolds. exists.
   repeat econstructor.
@@ -892,7 +787,7 @@ Local Definition c2 : cmd :=
    CAssn "i" (ASub (AVar "i") #1)).
 
 Local Lemma ex2_eval m :
-  yields c2 m (upd (upd m "x" 8) "i" 0).
+  yields c2 m (m["x"=8]["i"=0]).
 Proof.
   econstructor.
   econstructor. econstructor. econstructor.
