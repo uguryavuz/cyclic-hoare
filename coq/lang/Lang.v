@@ -1,107 +1,85 @@
 Set Implicit Arguments.
-
 Import SigTNotations.
-
 From Lang Require Import Util.
 
 Open Scope fmap_scope.
 
-
 Definition varid := string.
-
 Definition mem := tmap varid int.
+
 Implicit Type m : mem.
-
-
 
 Section Language.
 
 Inductive aexp :=
-| AVal (n:int)
-| AVar (x:varid)
-| ANeg (a:aexp)
-| AAdd (a1 a2:aexp)
-| ASub (a1 a2:aexp)
-| AMul (a1 a2:aexp)
-.
+  | AVal (n : int)
+  | AVar (x : varid)
+  | ANeg (a : aexp)
+  | AAdd (a1 a2 : aexp)
+  | ASub (a1 a2 : aexp)
+  | AMul (a1 a2 : aexp).
 
 Inductive bexp :=
-| BVal (b:bool)
-| BNot (b:bexp)
-| BAnd (b1 b2:bexp)
-| BOr  (b1 b2:bexp)
-| BImp (b1 b2:bexp)
-| BEqB (b1 b2:bexp)
-| BEqA (a1 a2:aexp)
-| BLt  (a1 a2:aexp)
-| BLeq (a1 a2:aexp)
-.
-
+  | BVal (b : bool)
+  | BNot (b : bexp)
+  | BAnd (b1 b2 : bexp)
+  | BOr  (b1 b2 : bexp)
+  | BImp (b1 b2 : bexp)
+  | BEqB (b1 b2 : bexp)
+  | BEqA (a1 a2 : aexp)
+  | BLt  (a1 a2 : aexp)
+  | BLeq (a1 a2 : aexp).
 
 Inductive cmd :=
-| CSkip
-| CSeq (c : cmd) (c : cmd)
-| CIf (e : bexp) (c1 c2 : cmd)
-| CAssn (x : varid) (e : aexp)
-| CWhile (e : bexp) (c : cmd)
-.
-
-
+  | CSkip
+  | CSeq (c : cmd) (c : cmd)
+  | CIf (e : bexp) (c1 c2 : cmd)
+  | CAssn (x : varid) (e : aexp)
+  | CWhile (e : bexp) (c : cmd).
 
 Fixpoint aeval m a : int :=
-match a with
-| AVal n => n
-| AVar x => m x
-| ANeg a => -(aeval m a)
-| AAdd a1 a2 => (aeval m a1) + (aeval m a2)
-| ASub a1 a2 => (aeval m a1) - (aeval m a2)
-| AMul a1 a2 => (aeval m a1) * (aeval m a2)
-end.
+  match a with
+  | AVal n => n
+  | AVar x => m x
+  | ANeg a => -(aeval m a)
+  | AAdd a1 a2 => (aeval m a1) + (aeval m a2)
+  | ASub a1 a2 => (aeval m a1) - (aeval m a2)
+  | AMul a1 a2 => (aeval m a1) * (aeval m a2)
+  end.
 
 Fixpoint beval m b : bool :=
-match b with
-| BVal b => b
-| BNot b => ! (beval m b)
-| BAnd b1 b2 => (beval m b1) && (beval m b2)
-| BOr  b1 b2 => (beval m b1) || (beval m b2)
-| BImp b1 b2 => implb (beval m b1) (beval m b2)
-| BEqB b1 b2 => Bool.eqb (beval m b1) (beval m b2)
-| BEqA a1 a2 => Z.eqb (aeval m a1) (aeval m a2)
-| BLt  a1 a2 => Z.ltb (aeval m a1) (aeval m a2)
-| BLeq a1 a2 => Z.leb (aeval m a1) (aeval m a2)
-end.
-
+  match b with
+  | BVal b => b
+  | BNot b => ! (beval m b)
+  | BAnd b1 b2 => (beval m b1) && (beval m b2)
+  | BOr  b1 b2 => (beval m b1) || (beval m b2)
+  | BImp b1 b2 => implb (beval m b1) (beval m b2)
+  | BEqB b1 b2 => Bool.eqb (beval m b1) (beval m b2)
+  | BEqA a1 a2 => Z.eqb (aeval m a1) (aeval m a2)
+  | BLt  a1 a2 => Z.ltb (aeval m a1) (aeval m a2)
+  | BLeq a1 a2 => Z.leb (aeval m a1) (aeval m a2)
+  end.
 
 Inductive cstep : cmd -> mem -> cmd -> mem -> Prop :=
-| StepSeq m m' c1 c1' c2
-  (H1 : cstep c1 m c1' m')
-  : cstep (CSeq c1 c2) m (CSeq c1' c2) m'
-| StepSeqSkip m c
-  : cstep (CSeq CSkip c) m c m
-| StepIfTrue m b c1 c2
-  (Hg : beval m b)
-  : cstep (CIf b c1 c2) m c1 m
-| StepIfFalse m b c1 c2
-  (Hg : ~ beval m b)
-  : cstep (CIf b c1 c2) m c2 m
-| StepWhileTrue m b c
-  (Hg : beval m b)
-  : cstep (CWhile b c) m (CSeq c (CWhile b c)) m
-| StepWhileFalse m b c
-  (Hg : ~ beval m b)
-  : cstep (CWhile b c) m CSkip m
-| StepAssn m x a
-  : cstep (CAssn x a) m CSkip (m[x=(aeval m a)])
-.
+  | StepSeq :
+      forall m m' c1 c1' c2 (H1 : cstep c1 m c1' m'),
+        cstep (CSeq c1 c2) m (CSeq c1' c2) m'
+  | StepSeqSkip : forall m c, cstep (CSeq CSkip c) m c m
+  | StepIfTrue : forall m b c1 c2 (Hg : beval m b), cstep (CIf b c1 c2) m c1 m
+  | StepIfFalse :
+      forall m b c1 c2 (Hg : ~ beval m b), cstep (CIf b c1 c2) m c2 m
+  | StepWhileTrue :
+      forall m b c (Hg : beval m b),
+        cstep (CWhile b c) m (CSeq c (CWhile b c)) m
+  | StepWhileFalse :
+      forall m b c (Hg : ~ beval m b), cstep (CWhile b c) m CSkip m
+  | StepAssn m x a : cstep (CAssn x a) m CSkip (m[x=(aeval m a)]).
 
 
 Inductive multistep : cmd -> mem -> cmd -> mem -> nat -> Prop :=
-| Multi0 c m : multistep c m c m O
-| MultiI c c' c'' m m' m'' n
-  (H : cstep c m c' m') 
-  (H' : multistep c' m' c'' m'' n)
-  : multistep c m c'' m'' (S n)
-.
+  | Multi0 c m : multistep c m c m O
+  | MultiI c c' c'' m m' m'' n (H : cstep c m c' m') (H' : multistep c' m' c'' m'' n) : 
+      multistep c m c'' m'' (S n).
 
 Definition yields c m m' :=
   exists n, multistep c m CSkip m' n.
@@ -111,7 +89,6 @@ Definition terminates c m :=
 
 Definition diverges c m :=
   ~ terminates c m.
-
 
 Lemma seq_intermediate c1 c2 m m'' :
   yields (CSeq c1 c2) m m'' ->
@@ -125,7 +102,6 @@ Proof using.
   generalize dependent c2.
   generalize dependent m.
   generalize dependent m''.
-  
   induction n.
   { intros. inverts H. }
   intros. sort.
@@ -145,8 +121,6 @@ Qed.
 
 End Language.
 
-
-
 Lemma eq_emptyset {T} (X : [T]) :
   X = ∅ <-> ~ exists x, X x.
 Proof using.
@@ -161,50 +135,48 @@ Ltac empty_inhab_false :=
     rewrite emptyset_false in H; contradiction
   end.
 
-
 Definition ivarid := string.
 Inductive ivar : Type :=
-| IVar (i : ivarid).
+  | IVar (i : ivarid).
 
 Definition binding := tmap ivar int.
+
 Implicit Type I : binding.
 
 Section Assertions.
 
 Inductive aexpv :=
-| AvVal (n:int)
-| AvVar (x:varid)
-| AvNeg (a:aexpv)
-| AvAdd (a1 a2:aexpv)
-| AvSub (a1 a2:aexpv)
-| AvMul (a1 a2:aexpv)
-| AvIVar (i:ivar)
-.
+  | AvVal (n : int)
+  | AvVar (x : varid)
+  | AvNeg (a : aexpv)
+  | AvAdd (a1 a2 : aexpv)
+  | AvSub (a1 a2 : aexpv)
+  | AvMul (a1 a2 : aexpv)
+  | AvIVar (i : ivar).
 
 Inductive assrt :=
-| AssrtVal (b:bool)
-| AssrtNot (b:assrt)
-| AssrtAnd (b1 b2:assrt)
-| AssrtOr  (b1 b2:assrt)
-| AssrtImp (b1 b2:assrt)
-| AssrtEqB (b1 b2:assrt)
-| AssrtEqA (a1 a2:aexpv)
-| AssrtLt  (a1 a2:aexpv)
-| AssrtLeq (a1 a2:aexpv)
-| AssrtForall (i:ivar) (b:assrt)
-| AssrtExists (i:ivar) (b:assrt)
-.
+  | AssrtVal (b : bool)
+  | AssrtNot (b : assrt)
+  | AssrtAnd (b1 b2 : assrt)
+  | AssrtOr  (b1 b2 : assrt)
+  | AssrtImp (b1 b2 : assrt)
+  | AssrtEqB (b1 b2 : assrt)
+  | AssrtEqA (a1 a2 : aexpv)
+  | AssrtLt  (a1 a2 : aexpv)
+  | AssrtLeq (a1 a2 : aexpv)
+  | AssrtForall (i : ivar) (b : assrt)
+  | AssrtExists (i : ivar) (b : assrt).
 
 Fixpoint aveval m I a : int :=
-match a with
-| AvVal n => n
-| AvVar x => m x
-| AvIVar i => I i
-| AvNeg a => -(aveval m I a)
-| AvAdd a1 a2 => (aveval m I a1) + (aveval m I a2)
-| AvSub a1 a2 => (aveval m I a1) - (aveval m I a2)
-| AvMul a1 a2 => (aveval m I a1) * (aveval m I a2)
-end.
+  match a with
+  | AvVal n => n
+  | AvVar x => m x
+  | AvIVar i => I i
+  | AvNeg a => -(aveval m I a)
+  | AvAdd a1 a2 => (aveval m I a1) + (aveval m I a2)
+  | AvSub a1 a2 => (aveval m I a1) - (aveval m I a2)
+  | AvMul a1 a2 => (aveval m I a1) * (aveval m I a2)
+  end.
 
 Implicit Type P Q : assrt.
 
@@ -525,7 +497,6 @@ End Assertions.
 
 Notation "m ',' I '|=' P" := (sat m I P) (at level 50).
 
-
 Section SatRules.
 
 Lemma sat_true m I :
@@ -614,17 +585,12 @@ Qed.
 
 End SatRules.
 
-
-
-
 Section Interp.
-
 
 Definition interp (P : bexp) : [mem] :=
   fun m => beval m P.
 
 Notation "'[[' P ']]'" := (interp P).
-
 
 Lemma interp_and (P Q : bexp) :
   [[BAnd P Q]] = [[P]] ∩ [[Q]].
@@ -681,19 +647,14 @@ Proof using.
   - symmetry. rewrite prop_eq_True_eq. left~.
 Qed.
 
-
 End Interp.
-
 
 Notation "'[[' P ']]'" := (interp P).
 
-
 Section Valid.
-
 
 Definition valid (b : bexp) :=
   forall m, beval m b.
-
 
 Lemma valid_interp b :
   valid b <-> [[b]] = ⬤.
@@ -707,9 +668,7 @@ Proof using.
   rewrite H. now rewrite univ_set_true.
 Qed.
 
-
 Notation "'⊨' P" := (valid P) (at level 50).
-
 
 Lemma true_eq H :
   True = H <-> H.
@@ -717,7 +676,6 @@ Proof using.
   splits; intros; subst~.
   symmetry. rewrite~ prop_eq_True_eq.
 Qed.
-
 
 Lemma valid_and (P Q : bexp) :
   ⊨ BAnd P Q <-> (⊨ P /\ ⊨ Q).
@@ -756,12 +714,9 @@ Proof using.
     now destruct (beval m Q).
 Qed.
 
-
 End Valid.
 
-
 Section Example.
-
 
 Local Definition c1 : cmd :=
   CAssn "x" (AMul (AVal 5) (AVal 10)).
@@ -774,9 +729,7 @@ Proof.
 Qed.
 
 Notation "c1 ;; c2" := (CSeq c1 c2) (at level 39, right associativity).
-
 Notation "x @@ z w" := (x (z w)) (at level 38, right associativity, only parsing).
-
 Notation "# n" := (AVal n) (at level 5).
 
 Local Definition c2 : cmd :=
