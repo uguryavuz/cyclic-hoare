@@ -129,6 +129,41 @@ to yield exactly one value $v \in \Vals$.
 % \]
 
 
+% \subsection{Memories}
+
+\subsection*{Small-step operational semantics}
+
+\begin{mathpar}
+    % Assignment
+    \inferrule*[right=SS-Assn]
+    { \Eval(a,m)=v }
+    { \Cfg(\Assn x = a, m) \sstepsto \Cfg(\Skip, \MemDef m[x->v]) }
+    % Sequencing
+    \\ \inferrule*[right=SS-Seq]
+    { \Cfg(c_0,m) \sstepsto \Cfg(c'_0,m') }
+    { \Cfg(\Seq c_0 ; c_1, m) \sstepsto \Cfg(c'_0 ; c_1, m')}
+    % Sequencing, skip elimination
+    \and \inferrule*[right=SS-Seq-Skip]
+    { }
+    { \Cfg(\Seq \Skip ; c, m) \sstepsto \Cfg(c, m) }
+    % If true
+    \and \inferrule*[right=SS-If-T]
+    { \Eval(b,m) = \True}
+    { \Cfg(\ITE b then c_1 else c_2, m) \sstepsto \Cfg(c_1, m)}
+    % If false
+    \and \inferrule*[right=SS-If-F]
+    { \Eval(b,m) = \False}
+    { \Cfg(\ITE b then c_1 else c_2, m) \sstepsto \Cfg(c_2, m)}
+    % While true
+    \and \inferrule*[right=SS-While-T]
+    { \Eval(b,m) = \True}
+    { \Cfg(\While b do c, m) \sstepsto \Cfg(\Seq c; \While b do c, m)}
+    % While false
+    \and \inferrule*[right=SS-While-F]
+    { \Eval(b,m) = \False}
+    { \Cfg(\While b do c, m) \sstepsto \Cfg(\Skip, m)}
+\end{mathpar}
+
 \subsection*{Multi-step reduction}
 
 Let $\sstepstotrans$ denote the reflexive transitive closure of $\sstepsto$. Namely,
@@ -156,8 +191,6 @@ and $\forall i \in [0,k).\ \Cfg(c_i,m_i) \sstepsto \Cfg(c_{i+1},m_{i+1})$.
     By induction on length of execution. See Coq proof.
 \end{proof}
 
-% \subsection{Memories}
-
 \section{Assertions}
 
 \newcommand*{\domivar}{\mathsf{IVar}}
@@ -180,7 +213,201 @@ integer variables.
 \end{array}
 \end{displaymath}
 where $i$ are bound integer variables.
+Define a \emph{binding} $I$ as a total mapping $\domivar \rightarrow \Z$.
+%
+Note how we may implicitly lift any
+arithmetic expression $a \in \DomAexp$ into
+an expression in $\DomAexpv$,
+and similarly a
+boolean expression $b \in \DomBexp$ into
+an assertion in $\DomAssert$, which
+contains no integer variables.
 
+\def\AVAL#1|#2|-#3{%
+    #1 \vDash_{#2} #3 %
+}
+\def\NAVAL#1|#2|-#3{%
+    #1 \nvDash_{#2} #3 %
+}
+
+\def\AVALmi#1{%
+    \AVAL m|I|- #1 %
+}
+
+\def\AVALU#1{%
+    \vDash #1 %
+}
+
+\def\EvalI(#1,#2,#3){%
+    \Interp{#1}_{#2,#3}
+}
+
+Define evaluation of arithmetic expressions with integer variables:
+%
+{
+\newcommand{\LINE}[2]{
+    \EvalI(#1,m,I) &\triangleq& #2 \\
+}
+%
+\begin{mathpar}
+\begin{array}{rcl}
+\LINE {n} {
+    n}
+\LINE {x} {
+    m(x)}
+\LINE {i} {
+    I(i)}
+\end{array}
+\and
+\begin{array}{rcl}
+\LINE {a_1 + a_2} {
+    \EvalI(a_1,m,I) + \EvalI(a_2,m,I)}
+\LINE {a_1 - a_2} {
+    \EvalI(a_1,m,I) - \EvalI(a_2,m,I)}
+\LINE {a_1 \times a_2} {
+    \EvalI(a_1,m,I) \times \Eval(a_2,m,I)}
+\end{array}
+\end{mathpar}
+}
+
+
+The relation $\AVAL m|I|-P$
+says that memory $m$ \emph{satisfies} assertion $P$
+with binding $I$.
+Notation $\AVALU P$ says that $P$ always holds
+in any memory and binding.
+The inductive rules for \emph{satisfaction} are:
+%
+\begin{mathpar}
+\inferrule*[right=Sat-\True]{ }{
+    \AVALmi \True
+}
+\and
+% \inferrule*[right=Val-\False]{ }{
+%     \NAVAL m|I|- \False
+% }
+% \and 
+\inferrule*[right=Sat-Neg]{
+    \neg\ \AVALmi P
+}{
+    \AVALmi \neg P
+}
+\and
+\inferrule*[right=Sat-$\wedge$]{
+    \AVALmi P \\
+    \AVALmi Q
+}{
+    \AVALmi P \wedge Q
+}
+\and \\
+\inferrule*[right=Sat-$\vee_L$]{
+    \AVALmi P
+}{
+    \AVALmi P \vee Q
+}
+\and
+\inferrule*[right=Sat-$\vee_R$]{
+    \AVALmi Q
+}{
+    \AVALmi P \vee Q
+}
+\and
+\inferrule*[right=Sat-$\Rightarrow$]{
+    \AVAL m|I|- P \Longrightarrow \AVAL m|I|- Q
+}{
+    \AVALmi P \Longrightarrow Q
+}
+\and
+% \inferrule*[right=Val-$\Rightarrow_L$]{
+%     \NAVAL m|I|- P
+% }{
+%     \AVALmi P \Longrightarrow Q
+% }
+% \and
+% \inferrule*[right=Val-$\Rightarrow_R$]{
+%     \AVALmi Q
+% }{
+%     \AVALmi P \Longrightarrow Q
+% }
+% \and
+\inferrule*[right=Sat-$\forall$]{
+    \forall n.\, \AVAL m| I[i \mapsto n] |- P
+}{
+    \AVALmi \forall i.\, P
+}
+\and
+\inferrule*[right=Sat-$\exists$]{
+    %\exists n.\, 
+    \AVAL m| I[i \mapsto n] |- P
+}{
+    \AVALmi \exists i.\, P
+}
+\and
+\inferrule*[right={Sat-$=_A$}]{
+    \EvalI(a_1,m,I) = \EvalI(a_2,m,I)
+}{
+    \AVALmi a_1 = a_2
+}
+\and
+\inferrule*[right=Sat-$<$]{
+    \EvalI(a_1,m,I) < \EvalI(a_2,m,I)
+}{
+    \AVALmi a_1 < a_2
+}
+\and
+\inferrule*[right=Sat-$\leq$]{
+    \EvalI(a_1,m,I) \leq \EvalI(a_2,m,I)
+}{
+    \AVALmi a_1 \leq a_2
+}
+\and
+\inferrule*[right={Sat-$=_B$}]{
+    \AVALmi b_1 \iff \AVALmi b_2
+}{
+    \AVALmi b_1 = b_2
+}
+\end{mathpar}
+
+Note that in our Coq implementation,
+rather than having individual rules
+we assert satisfaction
+by recursively translating an assertion
+into a Coq-level proposition.
+%
+We then prove the above rules hold
+w.r.t.\ this translation.
+
+We prove various properties of assertions and expressions.
+Note that when we discuss substitution into boolean expressions,
+substitutions only affect free variables ---
+they are overriden by quantified variables.
+
+\begin{lemma}
+For $b \in \DomBexp$,
+$\AVALmi b \iff \Eval(b,m) = \True$.
+\end{lemma}
+
+\begin{lemma}
+For $n \in \Z$ and $a \in \DomAexpv$,
+$\EvalI(a[n/x],m,I) = \EvalI(a,m[x \mapsto n],I)$.
+Similarly,
+$\EvalI(a[n/i],m,I) = \EvalI(a,m,I[i \mapsto n])$.
+\end{lemma}
+
+\begin{lemma}
+For $n \in \Z$,
+$\AVAL m | I |- P[n/x] \iff \AVAL m[x \mapsto n] | I |- P$.
+Similarly,
+$\AVAL m | I |- P[n/i] \iff \AVAL m | I[i \mapsto n] |- P$.
+\end{lemma}
+
+\begin{corollary}
+$\AVALmi \forall i.\, P \iff \forall n.\, \AVALmi P[n/i]$.
+Similarly,
+$\AVALmi \exists i.\, P \iff \exists n.\, \AVALmi P[n/i]$.
+\end{corollary}
+
+\iffalse
 We define the \emph{interpretation} of $P,Q \in \DomAssert$
 to yield the subset of memories
 in which the assertion holds:
@@ -243,40 +470,7 @@ Properties include:
 }}
 \end{mathpar}
 }
-
-
-\subsection*{Small-step operational semantics}
-
-\begin{mathpar}
-    % Assignment
-    \inferrule*[right=SS-Assn]
-    { \Eval(a,m)=v }
-    { \Cfg(\Assn x = a, m) \sstepsto \Cfg(\Skip, \MemDef m[x->v]) }
-    % Sequencing
-    \\ \inferrule*[right=SS-Seq]
-    { \Cfg(c_0,m) \sstepsto \Cfg(c'_0,m') }
-    { \Cfg(\Seq c_0 ; c_1, m) \sstepsto \Cfg(c'_0 ; c_1, m')}
-    % Sequencing, skip elimination
-    \and \inferrule*[right=SS-Seq-Skip]
-    { }
-    { \Cfg(\Seq \Skip ; c, m) \sstepsto \Cfg(c, m) }
-    % If true
-    \and \inferrule*[right=SS-If-T]
-    { \Eval(b,m) = \True}
-    { \Cfg(\ITE b then c_1 else c_2, m) \sstepsto \Cfg(c_1, m)}
-    % If false
-    \and \inferrule*[right=SS-If-F]
-    { \Eval(b,m) = \False}
-    { \Cfg(\ITE b then c_1 else c_2, m) \sstepsto \Cfg(c_2, m)}
-    % While true
-    \and \inferrule*[right=SS-While-T]
-    { \Eval(b,m) = \True}
-    { \Cfg(\While b do c, m) \sstepsto \Cfg(\Seq c; \While b do c, m)}
-    % While false
-    \and \inferrule*[right=SS-While-F]
-    { \Eval(b,m) = \False}
-    { \Cfg(\While b do c, m) \sstepsto \Cfg(\Skip, m)}
-\end{mathpar}
+\fi
 
 
 \section{Proof system for unary Hoare logic}
@@ -284,12 +478,18 @@ Properties include:
 \paragraph{Hoare judgements}
 We define partial Hoare triples:
 \begin{definition}
-    Judgment $\Triple c : P => Q$ is \emph{valid}
-    for program $c$ and boolean expressions $P$ and $Q$,
-    written $\VAL \Triple c : P => Q$, if
-    $$\forall m \in \Interp P, m'.\
+    $m$ \emph{satisfies}
+    $\Triple c : P => Q$ in $I$,
+    denoted $\AVALmi \Triple c : P => Q$,
+    iff    
+    $$\AVALmi P \implies \forall m'.\
     \Cfg(c,m) \sstepstotrans \Cfg(\Skip,m') \implies
-    m' \in \Interp Q.$$
+    \AVAL m'|I|-Q.$$
+%
+$\AVALU \Triple c : P => Q$ denotes
+that the triple is \emph{valid},
+namely $\AVALmi \Triple c : P => Q$
+for \emph{all} $m$ and $I$.
 \end{definition}
 
 We write $\DER \Triple c : P => Q$ to say that
@@ -320,9 +520,9 @@ the triple is \emph{derivable} in Hoare logic.
     % Case
     \and 
     \inferrule*[right=HL-Case]
-    { \VAL P \Longrightarrow e \vee \neg e \\
-        \DER \Triple c : P \wedge e => Q \\ 
-      \DER \Triple c : P \wedge \neg e => Q }
+    { \VAL P \Longrightarrow P' \vee \neg P' \\
+        \DER \Triple c : P \wedge P' => Q \\ 
+      \DER \Triple c : P \wedge \neg P' => Q }
     { \DER \Triple c : P => Q }
     \and
     \inferrule*[right=HL-False]
@@ -372,7 +572,6 @@ the triple is \emph{derivable} in Hoare logic.
 \noindent
 These rules are \emph{not} enough to subsume loop invariants, but with cyclic proofs they will be.
 These rules are enough to recover a branching \emph{if} rule (using \emph{case}).
-
 
 
 
@@ -714,5 +913,37 @@ In the case that $\Eval(e, m) = \True$, \todo{recourse to sequential execution l
 \newpage
 \input{holding}
 
+\newcommand{\rhl}[4]{
+    #1 \sim #2 : #3 \Rightarrow #4
+}
+
+\newcommand{\rhlsplit}[4]{
+    \begin{gathered}
+        #1 \sim #2 \\
+        {:}\ #3 \Rightarrow #4
+    \end{gathered}
+}
+
+\newcommand{\eqr}[1]{
+    {=}\hspace{-0.3em}\left\{#1\right\}
+}
+
+\newcommand{\dEnv}{\mathsf{Env}}
+\newcommand{\dA}{\mathsf{A}}
+\newcommand{\dB}{\mathsf{B}}
+
+\newcommand{\pSkip}{\mathsf{skip}}
+\newcommand{\one}{ {\{}1{\}} }
+\newcommand{\two}{ {\{}2{\}} }
+
+\[\begin{prooftree}
+    \infer0{(\eqr{d,x} \wedge d\one = \dEnv) \Rightarrow \eqr{x}}
+    \infer1[$\textbf{\textsc{Skip}}$]
+        {\rhl{\pSkip}{\pSkip}{\eqr{d,x} \wedge d\one = \dEnv}{\eqr{x}}}
+    \infer1[$\textbf{rcondf}_{1, 2}$]
+        {\rhl{H_1}{H_2}{\eqr{d,x} \wedge d\one = \dEnv}{\eqr{x}}}
+    \infer1[$\textbf{rcondf}_{1}$] 
+        {\rhl{U_1}{H_2}{\eqr{d,x} \wedge d\one = \dEnv}{\eqr{x}}}
+\end{prooftree}\]
 
 \end{document}
