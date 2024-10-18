@@ -75,6 +75,20 @@ Inductive cstep : cmd -> mem -> cmd -> mem -> Prop :=
       forall m b c (Hg : ~ beval m b), cstep (CWhile b c) m CSkip m
   | StepAssn m x a : cstep (CAssn x a) m CSkip (m[x=(aeval m a)]).
 
+Ltac cstep_skip :=
+  match goal with
+  | [ H : cstep CSkip _ _ _ |- _ ] => inverts H
+  end.
+
+Lemma cstep_skip :
+  forall m c' m',
+    cstep CSkip m c' m' -> False.
+Proof.
+  introv H.
+  cstep_skip.
+Qed.
+
+Hint Resolve cstep_skip.
 
 Inductive multistep : cmd -> mem -> cmd -> mem -> nat -> Prop :=
   | Multi0 c m : multistep c m c m O
@@ -118,6 +132,72 @@ Proof using.
   sort. unfolds. exists (S n0).
   econstructor. apply H6. auto.
 Qed.
+
+Lemma cstep_to_multistep : 
+  forall c m c' m',
+    cstep c m c' m' <-> multistep c m c' m' 1.
+Proof.
+  split.
+  intro H.
+  econstructor.
+  apply H.
+  constructor.
+  intro H.
+  inverts H.
+  inverts H'.
+  easy.
+Qed.
+
+Lemma deterministic_cstep :
+  forall c c1 c2 m m1 m2,
+    cstep c m c1 m1 ->
+    cstep c m c2 m2 ->
+    c1 = c2 /\ m1 = m2.
+Proof.
+  induction c.
+  + intros. cstep_skip.
+  + intros. 
+    inverts H.
+    inverts H0.
+    * specializes IHc1 H6 H7. destruct IHc1. subst. easy.
+    * cstep_skip.
+    * inverts H0. cstep_skip. easy.
+  + intros.
+    inverts H; inverts H0; try auto; contradiction.
+  + intros.
+    inverts H; inverts H0; easy.
+  + intros.
+    inverts H; inverts H0; try auto; contradiction.
+Qed.
+
+Lemma deterministic_multistep c :
+  (forall m m1 m2 n1 n2,
+    multistep c m CSkip m1 n1 ->
+    multistep c m CSkip m2 n2 ->
+    m1 = m2 /\ n1 = n2) /\ 
+  (forall c1 c2 m m1 m2 n,
+    multistep c m c1 m1 n ->
+    multistep c m c2 m2 n ->
+    c1 = c2 /\ m1 = m2).
+Proof.
+  induction c.
+  - introv H1 H2.
+    inverts H1. { inverts H2; easy. }
+    cstep_skip.
+  - introv H1 H2.
+    inverts H1.
+    inverts H2.
+    inverts H.
+    2: { inverts H0. cstep_skip. specializes IHc2 H' H'0. }
+    inverts H'.
+    sort.
+    inverts H0.
+    2: { cstep_skip. }
+    rewrite cstep_to_multistep in H6, H7.
+    specializes IHc1 
+
+Abort. 
+
 
 End Language.
 
@@ -585,6 +665,91 @@ Qed.
 
 End SatRules.
 
+Section Triples.
+
+
+
+
+End Triples.
+
+
+Section Example.
+
+Local Definition c1 : cmd :=
+  CAssn "x" (AMul (AVal 5) (AVal 10)).
+
+Local Lemma ex1_eval m :
+  yields c1 m (m["x"=50]).
+Proof.
+  unfolds. exists.
+  repeat econstructor.
+Qed.
+
+Notation "c1 ;; c2" := (CSeq c1 c2) (at level 39, right associativity).
+Notation "x @@ z w" := (x (z w)) (at level 38, right associativity, only parsing).
+Notation "# n" := (AVal n) (at level 5).
+
+Local Definition c2 : cmd :=
+  CAssn "x" #1 ;;
+  CAssn "i" #3 ;;
+  CWhile (BLt #0 (AVar "i"))
+  (CAssn "x" (AMul (AVar "x") #2);;
+   CAssn "i" (ASub (AVar "i") #1)).
+
+Local Lemma ex2_eval m :
+  yields c2 m (m["x"=8]["i"=0]).
+Proof.
+  econstructor.
+  econstructor. econstructor. econstructor.
+  simpls. econstructor.
+  apply StepSeqSkip. econstructor.
+  econstructor. econstructor.
+  econstructor. apply StepSeqSkip.
+  econstructor. econstructor.
+  simpls. unfolds upd. case_if.
+  constructor. simpls.
+  econstructor. repeat econstructor.
+  econstructor. econstructor.
+  apply StepSeqSkip. econstructor.
+  econstructor. econstructor.
+  do 2 rewrite upd_shadow2.
+  econstructor. apply StepSeqSkip.
+  econstructor. econstructor.
+  simpls. unfold upd. repeat case_if.
+  constructor. simpls.
+  rewrite upd_shadow1.
+  do 2 (rewrite upd_read2; [|discriminate]).
+  econstructor. econstructor.
+  econstructor. econstructor.
+  econstructor. econstructor.
+  apply StepSeqSkip. econstructor.
+  econstructor. econstructor.
+  simpls.
+  do 2 (rewrite upd_read2; [|discriminate]).
+  rewrite upd_shadow2. rewrite upd_shadow1.
+  econstructor. apply StepSeqSkip.
+  econstructor. econstructor.
+  simpls. rewrite upd_read1. constructor.
+  econstructor. econstructor.
+  econstructor. econstructor.
+  econstructor. econstructor.
+  apply StepSeqSkip. econstructor.
+  econstructor. econstructor.
+  simpls. 
+  do 2 (rewrite upd_read2; [|discriminate]).
+  rewrite upd_shadow2.
+  rewrite upd_shadow1.
+  econstructor. apply StepSeqSkip.
+  econstructor.
+  apply StepWhileFalse.
+  intro. inverts H.
+  rewrite upd_read1 in H1.
+  inverts H1.
+  econstructor.
+Qed.
+
+End Example.
+
 Section Interp.
 
 Definition interp (P : bexp) : [mem] :=
@@ -715,80 +880,3 @@ Proof using.
 Qed.
 
 End Valid.
-
-Section Example.
-
-Local Definition c1 : cmd :=
-  CAssn "x" (AMul (AVal 5) (AVal 10)).
-
-Local Lemma ex1_eval m :
-  yields c1 m (m["x"=50]).
-Proof.
-  unfolds. exists.
-  repeat econstructor.
-Qed.
-
-Notation "c1 ;; c2" := (CSeq c1 c2) (at level 39, right associativity).
-Notation "x @@ z w" := (x (z w)) (at level 38, right associativity, only parsing).
-Notation "# n" := (AVal n) (at level 5).
-
-Local Definition c2 : cmd :=
-  CAssn "x" #1 ;;
-  CAssn "i" #3 ;;
-  CWhile (BLt #0 (AVar "i"))
-  (CAssn "x" (AMul (AVar "x") #2);;
-   CAssn "i" (ASub (AVar "i") #1)).
-
-Local Lemma ex2_eval m :
-  yields c2 m (m["x"=8]["i"=0]).
-Proof.
-  econstructor.
-  econstructor. econstructor. econstructor.
-  simpls. econstructor.
-  apply StepSeqSkip. econstructor.
-  econstructor. econstructor.
-  econstructor. apply StepSeqSkip.
-  econstructor. econstructor.
-  simpls. unfolds upd. case_if.
-  constructor. simpls.
-  econstructor. repeat econstructor.
-  econstructor. econstructor.
-  apply StepSeqSkip. econstructor.
-  econstructor. econstructor.
-  do 2 rewrite upd_shadow2.
-  econstructor. apply StepSeqSkip.
-  econstructor. econstructor.
-  simpls. unfold upd. repeat case_if.
-  constructor. simpls.
-  rewrite upd_shadow1.
-  do 2 (rewrite upd_read2; [|discriminate]).
-  econstructor. econstructor.
-  econstructor. econstructor.
-  econstructor. econstructor.
-  apply StepSeqSkip. econstructor.
-  econstructor. econstructor.
-  simpls.
-  do 2 (rewrite upd_read2; [|discriminate]).
-  rewrite upd_shadow2. rewrite upd_shadow1.
-  econstructor. apply StepSeqSkip.
-  econstructor. econstructor.
-  simpls. rewrite upd_read1. constructor.
-  econstructor. econstructor.
-  econstructor. econstructor.
-  econstructor. econstructor.
-  apply StepSeqSkip. econstructor.
-  econstructor. econstructor.
-  simpls. 
-  do 2 (rewrite upd_read2; [|discriminate]).
-  rewrite upd_shadow2.
-  rewrite upd_shadow1.
-  econstructor. apply StepSeqSkip.
-  econstructor.
-  apply StepWhileFalse.
-  intro. inverts H.
-  rewrite upd_read1 in H1.
-  inverts H1.
-  econstructor.
-Qed.
-
-End Example.
