@@ -170,17 +170,39 @@ Proof.
     inverts H; inverts H0; try auto; contradiction.
 Qed.
 
-Lemma deterministic_multistep c :
-  (forall m m1 m2 n1 n2,
-    multistep c m CSkip m1 n1 ->
-    multistep c m CSkip m2 n2 ->
-    m1 = m2 /\ n1 = n2) /\ 
-  (forall c1 c2 m m1 m2 n,
+Lemma determinism_in_n_multistep : 
+  forall n c c1 c2 m m1 m2,
     multistep c m c1 m1 n ->
     multistep c m c2 m2 n ->
-    c1 = c2 /\ m1 = m2).
+    c1 = c2 /\ m1 = m2.
 Proof.
-  induction c.
+  induction n.
+  - intros. inverts H. inverts H0. easy.
+  - intros. inverts H. inverts H0.
+    pose proof deterministic_cstep H5 H6.
+    destruct H. subst.
+    specializes IHn H' H'0.
+Qed.
+
+Lemma deterministic_in_termination :
+  forall n1 n2 c m m1 m2,
+    multistep c m CSkip m1 n1 ->
+    multistep c m CSkip m2 n2 ->
+    m1 = m2 /\ n1 = n2.
+Proof.
+  induction n1; induction n2.
+  - introv H1 H2. inverts H1. inverts~ H2.
+  - introv H1 H2. inverts H1. inverts H2. cstep_skip.
+  - introv H1 H2. inverts H1. inverts H2. cstep_skip.
+  - introv H1 H2. 
+    inverts H1.
+    inverts H2.
+    pose proof deterministic_cstep H5 H6.
+    destruct H. subst. split.
+    specializes IHn2 H1.
+    inverts H2.
+Abort.  
+(* induction c.
   - introv H1 H2.
     inverts H1. { inverts H2; easy. }
     cstep_skip.
@@ -193,11 +215,16 @@ Proof.
     sort.
     inverts H0.
     2: { cstep_skip. }
-    rewrite cstep_to_multistep in H6, H7.
-    specializes IHc1 
-
-Abort. 
-
+    pose proof deterministic_cstep H6 H7.
+    destruct H0. subst.
+    clean.
+    inverts H'0.
+    sort.
+    pose proof deterministic_cstep H H0.
+    destruct H1. subst.
+    clean.
+    inverts H.
+    2: { inver *)
 
 End Language.
 
