@@ -166,13 +166,16 @@ to yield exactly one value $v \in \Vals$.
 
 \subsection*{Multi-step reduction}
 
-Let $\sstepstotrans$ denote the reflexive transitive closure of $\sstepsto$. Namely,
-$\Cfg(c,m) \sstepstotrans \Cfg(c',m')$ iff
-for $k\geq 0$ there exist
-$\Cfg(c_0,m_0),\dots,\Cfg(c_k,m_k)$
+$\Cfg(c,m) \sstepston n \Cfg(c',m')$ iff
+$\Cfg(c_0,m_0),\dots,\Cfg(c_n,m_n)$
 s.t.\ $\Cfg(c,m)=\Cfg(c_0,m_0)$,
 $\Cfg(c_k,m_k)=\Cfg(c',m')$,
-and $\forall i \in [0,k).\ \Cfg(c_i,m_i) \sstepsto \Cfg(c_{i+1},m_{i+1})$.
+and $\forall i \in [0,n).\ \Cfg(c_i,m_i) \sstepsto \Cfg(c_{i+1},m_{i+1})$.
+
+
+Let $\sstepstotrans$ be the reflexive transitive closure of $\sstepsto$. Namely,
+$\Cfg(c,m) \sstepstotrans \Cfg(c',m')$ iff
+$\exists n.\ \Cfg(c,m) \sstepston n \Cfg(c',m')$.
 
 \begin{definition}
     $c$ \emph{terminates} on $m$, denoted $\Terminate(c,m)$,
@@ -182,14 +185,27 @@ and $\forall i \in [0,k).\ \Cfg(c_i,m_i) \sstepsto \Cfg(c_{i+1},m_{i+1})$.
 \end{definition}
 
 \begin{lemma}[Sequential execution]
-    If $\Cfg(c_1; c_2, m) \sstepstotrans \Cfg(\Skip, m'')$, 
-    then there exists an intermediate memory $m'$ such that
-    $\Cfg(c_1, m) \sstepstotrans \Cfg(\Skip, m')$
-    and $\Cfg(c_2, m') \sstepstotrans \Cfg(\Skip, m'')$.
+    If $\Cfg(c_1; c_2, m) \sstepston n \Cfg(\Skip, m'')$, 
+    then intermediate memory $m'$ exists s.t.\
+    $\Cfg(c_1, m) \sstepston{n_1} \Cfg(\Skip, m')$
+    and $\Cfg(c_2, m') \sstepston{n_2} \Cfg(\Skip, m'')$
+    where $n_1+n_2+1=n$.
 \end{lemma}
 \begin{proof}
     By induction on length of execution. See Coq proof.
 \end{proof}
+
+\begin{lemma}
+    If $\Cfg(c,m) \sstepston n \Cfg(c_1,m_1)$,
+    and $\Cfg(c,m) \sstepston n \Cfg(c_2,m_2)$,
+    then $c_1 = c_2$ and $m_1 = m_2$.
+\end{lemma}
+
+\begin{lemma}
+    If $\Cfg(c,m) \sstepston{n_1} \Cfg(\Skip,m_1)$,
+    and $\Cfg(c,m) \sstepston{n_2} \Cfg(\Skip,m_2)$,
+    then $m_1 = m_2$ and $n_1 = n_2$.
+\end{lemma}
 
 \section{Assertions}
 

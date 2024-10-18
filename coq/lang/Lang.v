@@ -104,35 +104,6 @@ Definition terminates c m :=
 Definition diverges c m :=
   ~ terminates c m.
 
-Lemma seq_intermediate c1 c2 m m'' :
-  yields (CSeq c1 c2) m m'' ->
-  exists m',
-  yields c1 m m' /\
-  yields c2 m' m''.
-Proof using.
-  intros (n&H).
-  generalize dependent H.
-  generalize dependent c1.
-  generalize dependent c2.
-  generalize dependent m.
-  generalize dependent m''.
-  induction n.
-  { intros. inverts H. }
-  intros. sort.
-  inverts H. sort.
-  inverts H5.
-  2: { 
-    exists m'. splits~.
-    unfolds. exists. constructor.
-    unfolds. exists. apply H'.
-  }
-  specializes IHn H'. exists* IHn.
-  exists m'0. splits~.
-  unfold yields in IHn. exists* IHn.
-  sort. unfolds. exists (S n0).
-  econstructor. apply H6. auto.
-Qed.
-
 Lemma cstep_to_multistep : 
   forall c m c' m',
     cstep c m c' m' <-> multistep c m c' m' 1.
@@ -184,47 +155,78 @@ Proof.
     specializes IHn H' H'0.
 Qed.
 
-Lemma deterministic_in_termination :
+Lemma determinism_in_multistep_termination :
   forall n1 n2 c m m1 m2,
     multistep c m CSkip m1 n1 ->
     multistep c m CSkip m2 n2 ->
     m1 = m2 /\ n1 = n2.
 Proof.
-  induction n1; induction n2.
-  - introv H1 H2. inverts H1. inverts~ H2.
-  - introv H1 H2. inverts H1. inverts H2. cstep_skip.
-  - introv H1 H2. inverts H1. inverts H2. cstep_skip.
-  - introv H1 H2. 
-    inverts H1.
-    inverts H2.
-    pose proof deterministic_cstep H5 H6.
-    destruct H. subst. split.
-    specializes IHn2 H1.
-    inverts H2.
-Abort.  
-(* induction c.
-  - introv H1 H2.
-    inverts H1. { inverts H2; easy. }
-    cstep_skip.
-  - introv H1 H2.
-    inverts H1.
-    inverts H2.
-    inverts H.
-    2: { inverts H0. cstep_skip. specializes IHc2 H' H'0. }
-    inverts H'.
-    sort.
-    inverts H0.
-    2: { cstep_skip. }
-    pose proof deterministic_cstep H6 H7.
-    destruct H0. subst.
-    clean.
-    inverts H'0.
-    sort.
-    pose proof deterministic_cstep H H0.
-    destruct H1. subst.
-    clean.
-    inverts H.
-    2: { inver *)
+  induction n1.
+  { introv H1 H2. inverts H1. inverts~ H2. cstep_skip. }
+  introv H1 H2.
+  inverts H1.
+  inverts H2.
+  cstep_skip.
+  pose proof deterministic_cstep H H6.
+  destruct H0. subst. clean.
+  specializes IHn1 H' H'0.
+Qed.
+
+Lemma determinism_in_yielding :
+  forall c m m1 m2,
+    yields c m m1 ->
+    yields c m m2 ->
+    m1 = m2.
+Proof.
+  introv H1 H2.
+  destruct H1 as [n1 H1].
+  destruct H2 as [n2 H2].
+  pose proof determinism_in_multistep_termination H1 H2.
+  destruct H. auto.
+Qed.
+
+Lemma seq_intermediate_multistep :
+  forall n c1 c2 m m'',
+    multistep (CSeq c1 c2) m CSkip m'' n ->
+    exists n1 n2 m',
+      multistep c1 m CSkip m' n1 /\ 
+      multistep c2 m' CSkip m'' n2 /\ 
+      S (n1 + n2) = n.
+Proof.
+  induction n.
+  { introv H. inverts H. }
+  introv H.
+  inverts H.
+  inverts H5; sort.
+  + specializes IHn H'. 
+    exists* IHn. 
+    exists (S n1) n2 m'0.
+    splits~.
+    econstructor.
+    apply H6.
+    trivial.
+  + exists.
+    splits.
+    constructor.
+    apply H'.
+    math.
+Qed.
+
+Lemma seq_intermediate_yields c1 c2 m m'' :
+  yields (CSeq c1 c2) m m'' ->
+  exists m',
+  yields c1 m m' /\
+  yields c2 m' m''.
+Proof.
+  intros.
+  destruct H as [n H].
+  pose proof seq_intermediate_multistep H.
+  exists* H0.
+  exists m'.
+  split. 
+  exists~ n1. 
+  exists~ n2.
+Qed.
 
 End Language.
 
@@ -249,6 +251,7 @@ Inductive ivar : Type :=
 Definition binding := tmap ivar int.
 
 Implicit Type I : binding.
+Implicit Type c : cmd.
 
 Section Assertions.
 
@@ -303,6 +306,11 @@ Fixpoint sat m I P : Prop :=
   end.
 
 Notation "m ',' I '|=' P" := (sat m I P) (at level 50).
+
+Definition valid_assrt P :=
+  forall m I, m, I |= P.
+
+Notation "'|=' P" := (valid_assrt P) (at level 50).
 
 Fixpoint aexp_to_aexpv a : aexpv :=
   match a with
@@ -603,6 +611,7 @@ Qed.
 End Assertions.
 
 Notation "m ',' I '|=' P" := (sat m I P) (at level 50).
+Notation "'|=' P" := (valid_assrt P) (at level 50).
 
 Section SatRules.
 
@@ -694,10 +703,42 @@ End SatRules.
 
 Section Triples.
 
+Definition triple m I c P Q :=
+  m,I |= P ->
+  forall m', yields c m m' ->
+  m',I |= Q.
 
+Definition valid_triple c P Q :=
+  forall m I, triple m I c P Q.
 
+Inductive derivable_triple c P Q :=
+  | HL_CSQ P' Q' 
+      (H1 : |= AssrtImp P P') (H2 : derivable_triple c P' Q')  (H3 : |= AssrtImp Q' Q)
+    : derivable_triple c P Q
+  | HL_Case P'
+      (H1 : derivable_triple c (AssrtAnd P P') Q) (H2 : derivable_triple c (AssrtAnd P (AssrtNot P')) Q)
+    : derivable_triple c P Q.
+  (* | HL_Case *)
 
 End Triples.
+
+Section Soundness.
+
+Lemma csq_sound1 c P Q P' Q' 
+  (H1 : |= AssrtImp P P') (H2 : valid_triple c P' Q') (H3 : |= AssrtImp Q' Q) : valid_triple c P Q.
+Proof.
+  unfolds valid_triple, triple, valid_assrt.
+  intros.
+  specializes H1 m I.
+  simpls.
+  specializes H1 H.
+  specializes H2 H1.
+  specializes H2 H0.
+  apply H3.
+  trivial.
+Qed.
+
+End Soundness.
 
 
 Section Example.
