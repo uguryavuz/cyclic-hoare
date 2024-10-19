@@ -241,7 +241,7 @@ Proof.
   splits; intros.
   subst. intro. now exists* H.
   contra H. now apply not_emptyset in H.
-Admitted. (* VSCoq is being dumb *)
+Qed.
 
 Ltac empty_inhab_false :=
   match goal with
@@ -827,10 +827,9 @@ Inductive derivable_triple : cmd -> assrt -> assrt -> Prop :=
       (H1 : derivable_triple c (AssrtAnd P P') Q) 
       (H2 : derivable_triple c (AssrtAnd P (AssrtNot P')) Q) :
       derivable_triple c P Q
-  (* Symbolic excecution rules *)
+  (* Symbolic execution rules *)
   | HL_Skip P : 
       derivable_triple CSkip P P
-  (* Assignment has a premise now! *)
   | HL_Assn x (a : aexp) P :
       derivable_triple (CAssn x a) (assrt_subst x (aexp_to_aexpv a) (aexp_no_ivars a) P) P
   | HL_Seq c c' P Q R
@@ -914,7 +913,17 @@ Proof.
   simpls. now apply subst_val.
 Qed.
 
-
+Lemma seq_sound c c' P Q R :
+  valid_triple c P Q ->
+  valid_triple c' Q R ->
+  valid_triple (CSeq c c') P R.
+Proof.
+  unfolds valid_triple, triple, valid_assrt.
+  intros.
+  apply seq_intermediate_yields in H2.
+  destruct H2 as (m'' & H2 & H3).
+  specializes H m I.
+Qed.
 
 End Soundness.
 
