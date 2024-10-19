@@ -88,7 +88,7 @@ Proof.
   cstep_skip.
 Qed.
 
-Hint Resolve cstep_skip.
+Hint Resolve cstep_skip : core.
 
 Inductive multistep : cmd -> mem -> cmd -> mem -> nat -> Prop :=
   | Multi0 c m : multistep c m c m O
@@ -230,13 +230,18 @@ Qed.
 
 End Language.
 
+Ltac cstep_skip :=
+  match goal with
+  | [ H : cstep CSkip _ _ _ |- _ ] => inverts H
+  end.
+
 Lemma eq_emptyset {T} (X : [T]) :
   X = ∅ <-> ~ exists x, X x.
-Proof using.
+Proof.
   splits; intros.
   subst. intro. now exists* H.
   contra H. now apply not_emptyset in H.
-Qed.
+Admitted. (* VSCoq is being dumb *)
 
 Ltac empty_inhab_false :=
   match goal with
@@ -324,7 +329,7 @@ Fixpoint aexp_to_aexpv a : aexpv :=
 
 Lemma aexp_aexpv_equiv m I a :
   aveval m I (aexp_to_aexpv a) = aeval m a.
-Proof using.
+Proof.
   induction a; simpls; f_equal~.
 Qed.
 
@@ -343,7 +348,7 @@ Fixpoint bexp_to_assrt b : assrt :=
 
 Lemma bexp_assrt_equiv m I b :
   sat m I (bexp_to_assrt b) <-> beval m b.
-Proof using.
+Proof.
   induction b; simpls.
   - reflexivity.
   - split; intros. contra H. apply IHb. 
@@ -461,7 +466,7 @@ Definition assrt_isubst (i : ivar) (a : aexpv) (H : ~ has_ivars a) : assrt -> as
 
 Lemma aexpv_subst_equiv m I x a n : 
   aveval m I (aexpv_subst x (AvVal n) a) = aveval (m[x=n]) I a.
-Proof using.
+Proof.
   induction a; simpls; auto; try math.
   + case_if; simpls.
     * subst. rewrite upd_read1. trivial.
@@ -470,7 +475,7 @@ Qed.
 
 Lemma aexpv_isubst_equiv m I i a n : 
   aveval m I (aexpv_isubst i (AvVal n) a) = aveval m (I[i=n]) a.
-Proof using.
+Proof.
   induction a; simpls; auto; try math.
   + case_if; simpls.
     * subst. rewrite upd_read1. trivial.
@@ -479,7 +484,7 @@ Qed.
 
 Lemma assrt_subst_equiv m I x n P H :
   sat m I (assrt_subst x (AvVal n) H P) <-> sat (m[x=n]) I P.
-Proof using.
+Proof.
   generalize dependent n. 
   generalize dependent I. 
   induction P; simpls; auto; try easy.
@@ -525,7 +530,7 @@ Qed.
 
 Lemma assrt_isubst_equiv m I i n P H :
   sat m I (assrt_isubst i (AvVal n) H P) <-> sat m (I[i=n]) P.
-Proof using.
+Proof.
   generalize dependent n. 
   generalize dependent I. 
   induction P; simpls; auto; try easy.
@@ -587,7 +592,7 @@ Qed.
 Corollary assrt_isubst_forall_equiv m I i P :
   sat m I (AssrtForall i P) <->
   forall n H, sat m I (assrt_isubst i (AvVal n) H P).
-Proof using.
+Proof.
   simpls. split; intros.
   - apply assrt_isubst_equiv. apply H.
   - specializes H n. specializes~ H.
@@ -599,7 +604,7 @@ Qed.
 Corollary assrt_isubst_exists_equiv m I i P :
   sat m I (AssrtExists i P) <->
   exists n H, sat m I (assrt_isubst i (AvVal n) H P).
-Proof using.
+Proof.
   simpls. splits; intros.
   - destruct H. rewrite <- assrt_isubst_equiv in H.
     exists x. exists. apply H.
@@ -607,6 +612,106 @@ Proof using.
   - exists* H. apply assrt_isubst_equiv in H.
     exists. apply H.
 Qed.
+
+
+Lemma aexpv_subst_compat b :
+  forall m I x a a',
+  aeval m a = aeval m a' ->
+  aveval m I (aexpv_subst x (aexp_to_aexpv a) b) =
+  aveval m I (aexpv_subst x (aexp_to_aexpv a') b).
+Proof.
+  induction b; simpls; intros; try easy.
+  - case_if~. subst.
+    do 2 rewrite aexp_aexpv_equiv. auto.
+  - f_equal. now apply IHb.
+  - rewrite IHb1 with (a':=a').
+    rewrite IHb2 with (a':=a'). all: auto.
+  - rewrite IHb1 with (a':=a').
+    rewrite IHb2 with (a':=a'). all: auto.
+  - rewrite IHb1 with (a':=a').
+    rewrite IHb2 with (a':=a'). all: auto.
+Qed.
+
+
+Lemma assrt_subst_compat P :
+  forall m I x a b,
+  aeval m a = aeval m b ->
+  (m,I |= assrt_subst x _ (aexp_no_ivars a) P <->
+  m,I |= assrt_subst x _ (aexp_no_ivars b) P).
+Proof.
+  induction P; simpls; intros.
+  - easy.
+  - rewrite iff_not_not_eq. apply~ IHP.
+  - split; intros (?&?).
+    + split. rewrite IHP1.
+      apply H0. auto.
+      rewrite IHP2.
+      apply H1. auto.
+    + split. rewrite IHP1.
+      apply H0. auto.
+      rewrite IHP2. apply H1. auto.
+  - split; intros.
+    + destruct H0.
+      left. rewrite IHP1.
+      apply H0. auto.
+      right. rewrite IHP2.
+      apply H0. auto.
+    + destruct H0.
+      left. rewrite IHP1.
+      apply H0. auto.
+      right. rewrite IHP2.
+      apply H0. auto.
+  - split; intros.
+    + rewrite IHP2. apply H0.
+      rewrite IHP1. apply H1. auto. auto.
+    + rewrite IHP2. apply H0.
+      rewrite IHP1. apply H1.
+      all: auto.
+  - split; intros.
+    all: apply prop_ext; split; intros.
+    + rewrite IHP2. rewrite <- H0.
+      rewrite IHP1. apply H1. auto. auto.
+    + rewrite IHP1. rewrite H0.
+      rewrite IHP2. apply H1. auto. auto.
+    + rewrite IHP2. rewrite <- H0.
+      rewrite IHP1. apply H1. auto. auto.
+    + rewrite IHP1. rewrite H0.
+      rewrite IHP2. apply H1. auto. auto.
+  - rewrite (aexpv_subst_compat _ _ _ _ a b).
+    rewrite (aexpv_subst_compat _ _ _ _ a b).
+    all: easy.
+  - rewrite (aexpv_subst_compat _ _ _ _ a b).
+    rewrite (aexpv_subst_compat _ _ _ _ a b).
+    all: easy.
+  - rewrite (aexpv_subst_compat _ _ _ _ a b).
+    rewrite (aexpv_subst_compat _ _ _ _ a b).
+    all: easy.
+  - splits; intros; sort.
+    + rewrite IHP. apply H0. auto.
+    + rewrite IHP. apply H0. auto.
+  - splits; intros; sort.
+    + destruct H0. exists x0.
+      rewrite IHP. apply H0. auto.
+    + destruct H0. exists x0.
+      rewrite IHP. apply H0. auto.
+Qed.
+
+
+Lemma val_no_ivars n :
+  ~ has_ivars (AvVal n).
+Proof. auto. Qed.
+
+
+Corollary subst_val P :
+  forall m I x a,
+  m,I |= assrt_subst x _ (aexp_no_ivars a) P <->
+  m,I |= assrt_subst x _ (@val_no_ivars (aeval m a)) P.
+Proof.
+  intros.
+  pose proof assrt_subst_compat P m I x a (AVal (aeval m a)).
+  auto.
+Qed.
+
 
 End Assertions.
 
@@ -617,14 +722,14 @@ Section SatRules.
 
 Lemma sat_true m I :
   m,I |= AssrtVal true.
-Proof using.
+Proof.
   easy.
 Qed.
 
 Lemma sat_neg m I P :
   ~ m,I |= P ->
   m,I |= AssrtNot P.
-Proof using.
+Proof.
   now simpls.
 Qed.
 
@@ -632,70 +737,70 @@ Lemma sat_and m I P1 P2 :
   m,I |= P1 ->
   m,I |= P2 ->
   m,I |= AssrtAnd P1 P2.
-Proof using.
+Proof.
   simpls. auto.
 Qed.
 
 Lemma sat_or_l m I P1 P2 :
   m,I |= P1 ->
   m,I |= AssrtOr P1 P2.
-Proof using.
+Proof.
   simpls. auto.
 Qed.
 
 Lemma sat_or_r m I P1 P2 :
   m,I |= P2 ->
   m,I |= AssrtOr P1 P2.
-Proof using.
+Proof.
   simpls. auto.
 Qed.
 
 Lemma sat_imp m I P1 P2 :
   (m,I |= P1 -> m,I |= P2) ->
   m,I |= AssrtImp P1 P2.
-Proof using.
+Proof.
   simpls. auto.
 Qed.
 
 Lemma sat_forall m i I P :
   (forall n, m, I[i=n] |= P) ->
   m,I |= AssrtForall i P.
-Proof using.
+Proof.
   simpls. auto.
 Qed.
 
 Lemma sat_exists m i n I P :
   m,I[i=n] |= P ->
   m,I |= AssrtExists i P.
-Proof using.
+Proof.
   simpls. intro. exists. apply H.
 Qed.
 
 Lemma sat_eqa m I a1 a2 :
   aveval m I a1 = aveval m I a2 ->
   m,I |= AssrtEqA a1 a2.
-Proof using.
+Proof.
   simpls. auto.
 Qed.
 
 Lemma sat_eqb m I P Q :
   (m,I |= P <-> m,I |= Q) ->
   m,I |= AssrtEqB P Q.
-Proof using.
+Proof.
   simpls. apply prop_ext.
 Qed.
 
 Lemma sat_lt m I a1 a2 :
   aveval m I a1 < aveval m I a2 ->
   m,I |= AssrtLt a1 a2.
-Proof using.
+Proof.
   simpls. auto.
 Qed.
 
 Lemma sat_leq m I a1 a2 :
   aveval m I a1 <= aveval m I a2 ->
   m,I |= AssrtLeq a1 a2.
-Proof using.
+Proof.
   simpls. auto.
 Qed.
 
@@ -711,35 +816,47 @@ Definition triple m I c P Q :=
 Definition valid_triple c P Q :=
   forall m I, triple m I c P Q.
 
+Reserved Notation "'|-' c ':' P '=>' Q" (at level 5, no associativity).
+
 Inductive derivable_triple : cmd -> assrt -> assrt -> Prop :=
   (* Structural rules *)
-  | HL_CSQ : forall c P Q P' Q'
-      (H1 : |= AssrtImp P P') (H2 : derivable_triple c P' Q')  (H3 : |= AssrtImp Q' Q),
+  | HL_CSQ c P Q P' Q'
+      (H1 : |= AssrtImp P P') (H2 : derivable_triple c P' Q') (H3 : |= AssrtImp Q' Q) :
       derivable_triple c P Q
-  | HL_Case : forall c P Q P'
-      (H1 : derivable_triple c (AssrtAnd P P') Q) (H2 : derivable_triple c (AssrtAnd P (AssrtNot P')) Q),
+  | HL_Case c P Q P'
+      (H1 : derivable_triple c (AssrtAnd P P') Q) 
+      (H2 : derivable_triple c (AssrtAnd P (AssrtNot P')) Q) :
       derivable_triple c P Q
   (* Symbolic excecution rules *)
-  | HL_Skip : forall P, 
+  | HL_Skip P : 
       derivable_triple CSkip P P
   (* Assignment has a premise now! *)
-  | HL_Assn : forall x (a : aexp) P
-      (H : ~ has_ivars (aexp_to_aexpv a)),
-      derivable_triple (CAssn x a) (assrt_subst x (aexp_to_aexpv a) H P) P
-  | HL_Seq : forall c c' P Q R
-      (H1 : derivable_triple c P Q) (H2 : derivable_triple c' Q R),
+  | HL_Assn x (a : aexp) P :
+      derivable_triple (CAssn x a) (assrt_subst x (aexp_to_aexpv a) (aexp_no_ivars a) P) P
+  | HL_Seq c c' P Q R
+      (H1 : derivable_triple c P Q) (H2 : derivable_triple c' Q R) :
       derivable_triple (CSeq c c') P R
-  | HL_IfTrue : forall b c c' P Q
-      (H : derivable_triple c (AssrtAnd P (bexp_to_assrt b)) Q),
+  | HL_IfTrue b c c' P Q
+      (H : derivable_triple c (AssrtAnd P (bexp_to_assrt b)) Q) :
       derivable_triple (CIf b c c') (AssrtAnd P (bexp_to_assrt b)) Q
-  | HL_IfFalse : forall b c c' P Q
-      (H : derivable_triple c (AssrtAnd P (AssrtNot (bexp_to_assrt b))) Q),
+  | HL_IfFalse b c c' P Q
+      (H : derivable_triple c (AssrtAnd P (AssrtNot (bexp_to_assrt b))) Q) :
       derivable_triple (CIf b c c') (AssrtAnd P (AssrtNot (bexp_to_assrt b))) Q
-  | HL_WhileTrue : forall b c P Q
-      (H : derivable_triple (CSeq c (CWhile b c)) (AssrtAnd P (bexp_to_assrt b)) Q),
+  | HL_WhileTrue b c P Q
+      (H : derivable_triple (CSeq c (CWhile b c)) (AssrtAnd P (bexp_to_assrt b)) Q) :
       derivable_triple (CWhile b c) (AssrtAnd P (bexp_to_assrt b)) (AssrtAnd Q (AssrtNot (bexp_to_assrt b)))
-  | HL_WhileFalse : forall b c P,
-      derivable_triple (CWhile b c) (AssrtAnd P (AssrtNot (bexp_to_assrt b))) (AssrtAnd P (bexp_to_assrt b)).
+  | HL_WhileFalse b c P :
+      derivable_triple (CWhile b c) (AssrtAnd P (AssrtNot (bexp_to_assrt b))) (AssrtAnd P (bexp_to_assrt b))
+(*where "'|-' c ':' P '=>' Q" := (derivable_triple c P Q)*)
+.
+
+(*Notation "'|--' c '!' P '>>' Q" := (derivable_triple c P Q) 
+  (no associativity, at level 100, c, P at next level, Q at level 200).
+
+Check (derivable_triple CSkip (AssrtVal true) (AssrtVal true)).
+
+Check (|-- CSkip ! AssrtVal true >> AssrtVal true).
+*)
 
 End Triples.
 
@@ -777,28 +894,27 @@ Qed.
 Lemma skip_sound P : valid_triple CSkip P P.
 Proof.
   unfolds valid_triple, triple, valid_assrt.
-  intros.
-  unfolds yields.
+  intros. unfolds yields.
   destruct H0.
-  inverts H0. { trivial. }
-  false.
-  eapply cstep_skip.
-  eauto.
+  inverts~ H0.
+  cstep_skip.
 Qed.
 
-Lemma assn_sound x a P (H : ~ has_ivars (aexp_to_aexpv a)) : 
-  valid_triple (CAssn x a) (assrt_subst x (aexp_to_aexpv a) H P) P.
+Lemma assn_sound x a P : 
+  valid_triple (CAssn x a) 
+    (assrt_subst x _ (aexp_no_ivars a) P) P.
 Proof.
   unfolds valid_triple, triple, valid_assrt.
-  intros.
-  inverts H1.
-  inverts H2.
-  inverts H1.
-  inverts H'.
-  2 : { inverts H1. }
-  destruct a; simpls.
-  (* This might get annoying *)
-Abort.
+  intros. unfolds in H0.
+  exists* H0. sort.
+  inverts H0. inverts H1.
+  inverts H'. 2: cstep_skip.
+  assert (~ has_ivars (AvVal (aeval m a))) as IV; auto.
+  apply assrt_subst_equiv with IV.
+  simpls. now apply subst_val.
+Qed.
+
+
 
 End Soundness.
 
@@ -888,7 +1004,7 @@ Notation "'[[' P ']]'" := (interp P).
 
 Lemma interp_and (P Q : bexp) :
   [[BAnd P Q]] = [[P]] ∩ [[Q]].
-Proof using.
+Proof.
   unfolds. extensionality m.
   simpls. unfolds subset_and.
   apply istrue_and_eq.
@@ -896,7 +1012,7 @@ Qed.
 
 Lemma interp_or (P Q : bexp) :
   [[BOr P Q]] = [[P]] ∪ [[Q]].
-Proof using.
+Proof.
   extensionality m.
   unfolds. simpls.
   unfolds subset_or.
@@ -905,7 +1021,7 @@ Qed.
 
 Lemma interp_true :
   [[BVal true]] = ⬤.
-Proof using.
+Proof.
   unfolds. extensionality m.
   simpls. rewrite istrue_true_eq.
   symmetry. apply univ_set_true.
@@ -913,7 +1029,7 @@ Qed.
 
 Lemma interp_false :
   [[BVal false]] = ∅.
-Proof using.
+Proof.
   unfolds. extensionality m.
   simpls. rewrite istrue_false_eq.
   symmetry. apply emptyset_false.
@@ -921,14 +1037,14 @@ Qed.
 
 Lemma interp_not P :
   [[BNot P]] = not ∘ [[P]].
-Proof using.
+Proof.
   unfolds. extensionality m.
   simpls. now rewrite istrue_neg_eq.
 Qed.
 
 Lemma interp_imp (P Q : bexp) :
   [[BImp P Q]] = not ∘ [[P]] ∪ [[Q]].
-Proof using.
+Proof.
   unfolds. extensionality m.
   simpls. rewrite Bool.implb_orb.
   unfolds subset_or.
@@ -952,7 +1068,7 @@ Definition valid (b : bexp) :=
 
 Lemma valid_interp b :
   valid b <-> [[b]] = ⬤.
-Proof using.
+Proof.
   splits; intros.
   unfolds interp, valid.
   extensionality m. specializes H m.
@@ -966,14 +1082,14 @@ Notation "'⊨' P" := (valid P) (at level 50).
 
 Lemma true_eq H :
   True = H <-> H.
-Proof using.
+Proof.
   splits; intros; subst~.
   symmetry. rewrite~ prop_eq_True_eq.
 Qed.
 
 Lemma valid_and (P Q : bexp) :
   ⊨ BAnd P Q <-> (⊨ P /\ ⊨ Q).
-Proof using.
+Proof.
   unfolds valid. splits; intros.
   - apply forall_conj_inv_1. intros.
     specializes H x1. simpls.
@@ -984,7 +1100,7 @@ Qed.
 
 Lemma valid_or (P Q : bexp) :
   (⊨ P \/ ⊨ Q) -> ⊨ BOr P Q.
-Proof using.
+Proof.
   unfolds valid. intros. simpls.
   rewrite istrue_or_eq.
   destruct H; specializes H m.
@@ -994,7 +1110,7 @@ Qed.
 Lemma valid_imp (P Q : bexp) :
   [[P]] ⊆ [[Q]] <->
   ⊨ BImp P Q.
-Proof using.
+Proof.
   splits; intros.
   - intro m. simpls. specializes H m.
     unfolds interp.
