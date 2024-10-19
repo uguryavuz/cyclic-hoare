@@ -711,20 +711,41 @@ Definition triple m I c P Q :=
 Definition valid_triple c P Q :=
   forall m I, triple m I c P Q.
 
-Inductive derivable_triple c P Q :=
-  | HL_CSQ P' Q' 
-      (H1 : |= AssrtImp P P') (H2 : derivable_triple c P' Q')  (H3 : |= AssrtImp Q' Q)
-    : derivable_triple c P Q
-  | HL_Case P'
-      (H1 : derivable_triple c (AssrtAnd P P') Q) (H2 : derivable_triple c (AssrtAnd P (AssrtNot P')) Q)
-    : derivable_triple c P Q.
-  (* | HL_Case *)
+Inductive derivable_triple : cmd -> assrt -> assrt -> Prop :=
+  (* Structural rules *)
+  | HL_CSQ : forall c P Q P' Q'
+      (H1 : |= AssrtImp P P') (H2 : derivable_triple c P' Q')  (H3 : |= AssrtImp Q' Q),
+      derivable_triple c P Q
+  | HL_Case : forall c P Q P'
+      (H1 : derivable_triple c (AssrtAnd P P') Q) (H2 : derivable_triple c (AssrtAnd P (AssrtNot P')) Q),
+      derivable_triple c P Q
+  (* Symbolic excecution rules *)
+  | HL_Skip : forall P, 
+      derivable_triple CSkip P P
+  (* Assignment has a premise now! *)
+  | HL_Assn : forall x (a : aexp) P
+      (H : ~ has_ivars (aexp_to_aexpv a)),
+      derivable_triple (CAssn x a) (assrt_subst x (aexp_to_aexpv a) H P) P
+  | HL_Seq : forall c c' P Q R
+      (H1 : derivable_triple c P Q) (H2 : derivable_triple c' Q R),
+      derivable_triple (CSeq c c') P R
+  | HL_IfTrue : forall b c c' P Q
+      (H : derivable_triple c (AssrtAnd P (bexp_to_assrt b)) Q),
+      derivable_triple (CIf b c c') (AssrtAnd P (bexp_to_assrt b)) Q
+  | HL_IfFalse : forall b c c' P Q
+      (H : derivable_triple c (AssrtAnd P (AssrtNot (bexp_to_assrt b))) Q),
+      derivable_triple (CIf b c c') (AssrtAnd P (AssrtNot (bexp_to_assrt b))) Q
+  | HL_WhileTrue : forall b c P Q
+      (H : derivable_triple (CSeq c (CWhile b c)) (AssrtAnd P (bexp_to_assrt b)) Q),
+      derivable_triple (CWhile b c) (AssrtAnd P (bexp_to_assrt b)) (AssrtAnd Q (AssrtNot (bexp_to_assrt b)))
+  | HL_WhileFalse : forall b c P,
+      derivable_triple (CWhile b c) (AssrtAnd P (AssrtNot (bexp_to_assrt b))) (AssrtAnd P (bexp_to_assrt b)).
 
 End Triples.
 
 Section Soundness.
 
-Lemma csq_sound1 c P Q P' Q' 
+Lemma csq_sound c P Q P' Q' 
   (H1 : |= AssrtImp P P') (H2 : valid_triple c P' Q') (H3 : |= AssrtImp Q' Q) : valid_triple c P Q.
 Proof.
   unfolds valid_triple, triple, valid_assrt.
@@ -738,8 +759,48 @@ Proof.
   trivial.
 Qed.
 
-End Soundness.
+Lemma case_sound c P Q P' 
+  (H1 : valid_triple c (AssrtAnd P P') Q) (H2 : valid_triple c (AssrtAnd P (AssrtNot P')) Q) : valid_triple c P Q.
+Proof.
+  unfolds valid_triple, triple, valid_assrt.
+  intros.
+  simpls.
+  specializes H1 m I.
+  specializes H2 m I.
+  destruct (classic (m, I |= P')). (* LEM needed here *)
+  + specializes H1 (conj H H3). 
+    specializes~ H1 H0.
+  + specializes H2 (conj H H3). 
+    specializes~ H2 H0.
+Qed.
 
+Lemma skip_sound P : valid_triple CSkip P P.
+Proof.
+  unfolds valid_triple, triple, valid_assrt.
+  intros.
+  unfolds yields.
+  destruct H0.
+  inverts H0. { trivial. }
+  false.
+  eapply cstep_skip.
+  eauto.
+Qed.
+
+Lemma assn_sound x a P (H : ~ has_ivars (aexp_to_aexpv a)) : 
+  valid_triple (CAssn x a) (assrt_subst x (aexp_to_aexpv a) H P) P.
+Proof.
+  unfolds valid_triple, triple, valid_assrt.
+  intros.
+  inverts H1.
+  inverts H2.
+  inverts H1.
+  inverts H'.
+  2 : { inverts H1. }
+  destruct a; simpls.
+  (* This might get annoying *)
+Abort.
+
+End Soundness.
 
 Section Example.
 
