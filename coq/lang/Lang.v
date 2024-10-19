@@ -727,81 +727,64 @@ Proof.
 Qed.
 
 Lemma sat_neg m I P :
-  ~ m,I |= P ->
-  m,I |= AssrtNot P.
+  ~ m,I |= P <-> m,I |= AssrtNot P.
 Proof.
   now simpls.
 Qed.
 
 Lemma sat_and m I P1 P2 :
-  m,I |= P1 ->
-  m,I |= P2 ->
-  m,I |= AssrtAnd P1 P2.
+  (m,I |= P1 /\ m,I |= P2) <-> m,I |= AssrtAnd P1 P2.
 Proof.
-  simpls. auto.
+  simpls. split; auto.
 Qed.
 
-Lemma sat_or_l m I P1 P2 :
-  m,I |= P1 ->
-  m,I |= AssrtOr P1 P2.
+Lemma sat_or m I P1 P2 :
+  (m,I |= P1 \/ m,I |= P2) <-> m,I |= AssrtOr P1 P2.
 Proof.
-  simpls. auto.
-Qed.
-
-Lemma sat_or_r m I P1 P2 :
-  m,I |= P2 ->
-  m,I |= AssrtOr P1 P2.
-Proof.
-  simpls. auto.
+  simpls. split; intros; auto.
 Qed.
 
 Lemma sat_imp m I P1 P2 :
-  (m,I |= P1 -> m,I |= P2) ->
-  m,I |= AssrtImp P1 P2.
+  (m,I |= P1 -> m,I |= P2) <->  m,I |= AssrtImp P1 P2.
 Proof.
-  simpls. auto.
+  simpls. split; intros; auto.
 Qed.
 
 Lemma sat_forall m i I P :
-  (forall n, m, I[i=n] |= P) ->
-  m,I |= AssrtForall i P.
+  (forall n, m, I[i=n] |= P) <-> m,I |= AssrtForall i P.
 Proof.
-  simpls. auto.
+  simpls. split; intros; auto.
 Qed.
 
-Lemma sat_exists m i n I P :
-  m,I[i=n] |= P ->
-  m,I |= AssrtExists i P.
+Lemma sat_exists m i I P :
+  (exists n, m, I[i=n] |= P) <-> m,I |= AssrtExists i P.
 Proof.
-  simpls. intro. exists. apply H.
+  simpls. 
+  split. trivial. trivial.
 Qed.
 
 Lemma sat_eqa m I a1 a2 :
-  aveval m I a1 = aveval m I a2 ->
-  m,I |= AssrtEqA a1 a2.
+  (aveval m I a1 = aveval m I a2) <-> m,I |= AssrtEqA a1 a2.
 Proof.
-  simpls. auto.
+  simpls. split; auto.
 Qed.
 
 Lemma sat_eqb m I P Q :
-  (m,I |= P <-> m,I |= Q) ->
-  m,I |= AssrtEqB P Q.
+  (m,I |= P <-> m,I |= Q) <-> m,I |= AssrtEqB P Q.
 Proof.
-  simpls. apply prop_ext.
+  simpls. split; auto. apply prop_ext. intros. rewrite H. easy.
 Qed.
 
 Lemma sat_lt m I a1 a2 :
-  aveval m I a1 < aveval m I a2 ->
-  m,I |= AssrtLt a1 a2.
+  (aveval m I a1 < aveval m I a2) <-> m,I |= AssrtLt a1 a2.
 Proof.
-  simpls. auto.
+  simpls. split; auto.
 Qed.
 
 Lemma sat_leq m I a1 a2 :
-  aveval m I a1 <= aveval m I a2 ->
-  m,I |= AssrtLeq a1 a2.
+  (aveval m I a1 <= aveval m I a2) <-> m,I |= AssrtLeq a1 a2.
 Proof.
-  simpls. auto.
+  simpls. split; auto.
 Qed.
 
 End SatRules.
@@ -845,17 +828,7 @@ Inductive derivable_triple : cmd -> assrt -> assrt -> Prop :=
       (H : derivable_triple (CSeq c (CWhile b c)) (AssrtAnd P (bexp_to_assrt b)) Q) :
       derivable_triple (CWhile b c) (AssrtAnd P (bexp_to_assrt b)) (AssrtAnd Q (AssrtNot (bexp_to_assrt b)))
   | HL_WhileFalse b c P :
-      derivable_triple (CWhile b c) (AssrtAnd P (AssrtNot (bexp_to_assrt b))) (AssrtAnd P (bexp_to_assrt b))
-(*where "'|-' c ':' P '=>' Q" := (derivable_triple c P Q)*)
-.
-
-(*Notation "'|--' c '!' P '>>' Q" := (derivable_triple c P Q) 
-  (no associativity, at level 100, c, P at next level, Q at level 200).
-
-Check (derivable_triple CSkip (AssrtVal true) (AssrtVal true)).
-
-Check (|-- CSkip ! AssrtVal true >> AssrtVal true).
-*)
+      derivable_triple (CWhile b c) (AssrtAnd P (AssrtNot (bexp_to_assrt b))) (AssrtAnd P (AssrtNot (bexp_to_assrt b))).
 
 End Triples.
 
@@ -925,6 +898,61 @@ Proof.
   specializes H m I.
 Qed.
 
+Lemma false_rule_derivable c Q :
+  derivable_triple c (AssrtVal false) Q.
+Proof.
+  generalize dependent Q; induction c; intros.
+  - apply HL_CSQ with (P:=(AssrtVal false)) (P':=(AssrtVal false)) (Q:=Q) (Q':=(AssrtVal false)).
+    + introv. apply sat_imp. intros. easy.
+    + apply HL_Skip.
+    + introv. apply sat_imp. intros. easy.
+  - apply HL_Seq with (Q:=(AssrtVal false)). apply IHc1. apply IHc2.
+  - apply HL_Case with (P':=(bexp_to_assrt e)).
+    + apply HL_IfTrue. 
+      apply HL_CSQ with 
+        (P:=AssrtAnd (AssrtVal false) (bexp_to_assrt e)) (P':=(AssrtVal false)) (Q:=Q) (Q':=Q).
+      * introv. apply sat_imp. apply sat_and.
+      * apply IHc1.
+      * unfolds valid_assrt. intros. now apply sat_imp.
+    + apply HL_IfFalse.
+      apply HL_CSQ with 
+        (P:=AssrtAnd (AssrtVal false) (AssrtNot (bexp_to_assrt e))) (P':=(AssrtVal false)) (Q:=Q) (Q':=Q).
+      * introv. apply sat_imp. apply sat_and.
+      * apply IHc1.
+      * unfolds valid_assrt. intros. now apply sat_imp.
+  - pose proof (aexp_no_ivars e).
+    apply HL_CSQ with 
+      (P:=(AssrtVal false)) (P':=(AssrtVal false)) (Q:=Q) (Q':=(AssrtVal false)).
+    * introv. apply sat_imp. trivial.
+    * apply HL_Assn with (a:=e) (x:=x) (P:=(AssrtVal false)).
+    * introv. apply sat_imp. intros. apply sat_neg in H0. easy.
+      specializes H1 H0. false. false.
+  - (* Blooper reel: 
+      apply HL_Case with (P':=(bexp_to_assrt e)).
+      apply HL_CSQ with 
+        (P:=AssrtAnd (AssrtVal false) (bexp_to_assrt e)) 
+        (P':=AssrtAnd (AssrtVal false) (bexp_to_assrt e)) 
+        (Q:=Q) (Q':=AssrtAnd Q (AssrtNot (bexp_to_assrt e))).
+      * introv. apply sat_imp. trivial.
+      * apply HL_WhileTrue. apply HL_Seq with (Q:=(AssrtVal false)).
+        apply HL_CSQ with 
+          (P:=AssrtAnd (AssrtVal false) (bexp_to_assrt e)) (P':=(AssrtVal false)) (Q:=(AssrtVal false)) (Q':=(AssrtVal false)).
+        + introv. apply sat_imp. apply sat_and.
+        + apply IHc.
+        + introv. apply sat_imp. trivial.
+        + (* UH OH! Do we need cyclic proofs? *)
+    *)
+    apply HL_CSQ with 
+      (P:=(AssrtVal false)) 
+      (P':=(AssrtAnd (AssrtVal false) (AssrtNot (bexp_to_assrt e))))
+      (Q':=(AssrtAnd (AssrtVal false) (AssrtNot (bexp_to_assrt e))))
+      (Q:=Q).
+    * introv. apply sat_imp. intro. apply sat_neg in H. easy.
+      specializes H0 H. false. false.
+    * apply HL_WhileFalse. 
+    * introv. apply sat_imp. intros. apply sat_and in H. destruct H. false.
+Qed.
+    
 End Soundness.
 
 Section Example.
