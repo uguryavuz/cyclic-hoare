@@ -259,6 +259,8 @@ Definition binding := tmap ivar int.
 Implicit Type I : binding.
 Implicit Type c : cmd.
 
+Declare Scope assrt_scope.
+
 Section Assertions.
 
 Inductive aexpv :=
@@ -269,6 +271,35 @@ Inductive aexpv :=
   | AvSub (a1 a2 : aexpv)
   | AvMul (a1 a2 : aexpv)
   | AvIVar (i : ivar).
+
+Fixpoint aveval m I a : int :=
+  match a with
+  | AvVal n => n
+  | AvVar x => m x
+  | AvIVar i => I i
+  | AvNeg a => -(aveval m I a)
+  | AvAdd a1 a2 => (aveval m I a1) + (aveval m I a2)
+  | AvSub a1 a2 => (aveval m I a1) - (aveval m I a2)
+  | AvMul a1 a2 => (aveval m I a1) * (aveval m I a2)
+  end.
+
+Fixpoint aexp_to_aexpv a : aexpv :=
+  match a with
+  | AVal n => AvVal n
+  | AVar x => AvVar x
+  | ANeg a => AvNeg (aexp_to_aexpv a)
+  | AAdd a1 a2 => AvAdd (aexp_to_aexpv a1) (aexp_to_aexpv a2)
+  | ASub a1 a2 => AvSub (aexp_to_aexpv a1) (aexp_to_aexpv a2)
+  | AMul a1 a2 => AvMul (aexp_to_aexpv a1) (aexp_to_aexpv a2)
+  end.
+
+Coercion aexp_to_aexpv : aexp >-> aexpv.
+
+Lemma aexp_aexpv_equiv m I (a : aexp) :
+  aveval m I a = aeval m a.
+Proof.
+  induction a; simpls; f_equal~.
+Qed.
 
 Inductive assrt :=
   | AssrtVal (b : bool)
@@ -283,18 +314,18 @@ Inductive assrt :=
   | AssrtForall (i : ivar) (b : assrt)
   | AssrtExists (i : ivar) (b : assrt).
 
-Fixpoint aveval m I a : int :=
-  match a with
-  | AvVal n => n
-  | AvVar x => m x
-  | AvIVar i => I i
-  | AvNeg a => -(aveval m I a)
-  | AvAdd a1 a2 => (aveval m I a1) + (aveval m I a2)
-  | AvSub a1 a2 => (aveval m I a1) - (aveval m I a2)
-  | AvMul a1 a2 => (aveval m I a1) * (aveval m I a2)
-  end.
-
 Implicit Type P Q : assrt.
+
+Coercion AssrtVal : bool >-> assrt.
+
+Delimit Scope assrt_scope with A.
+
+Infix "/\" := AssrtAnd : assrt_scope.
+Infix "\/" := AssrtOr : assrt_scope.
+Infix "->" := AssrtImp : assrt_scope.
+Infix "<" := AssrtLt : assrt_scope.
+Infix "<=" := AssrtLeq : assrt_scope.
+Notation "~" := AssrtNot : assrt_scope.
 
 Fixpoint sat m I P : Prop :=
   match P with
@@ -316,43 +347,25 @@ Notation "m ',' I '|=' P" := (sat m I P) (at level 50).
 Definition valid_assrt P :=
   forall m I, m, I |= P.
 
-Notation "'|=' P" := (valid_assrt P) (at level 50).
-
-Fixpoint aexp_to_aexpv a : aexpv :=
-  match a with
-  | AVal n => AvVal n
-  | AVar x => AvVar x
-  | ANeg a => AvNeg (aexp_to_aexpv a)
-  | AAdd a1 a2 => AvAdd (aexp_to_aexpv a1) (aexp_to_aexpv a2)
-  | ASub a1 a2 => AvSub (aexp_to_aexpv a1) (aexp_to_aexpv a2)
-  | AMul a1 a2 => AvMul (aexp_to_aexpv a1) (aexp_to_aexpv a2)
-  end.
-
-Coercion aexp_to_aexpv : aexp >-> aexpv.
-
-Lemma aexp_aexpv_equiv m I (a : aexp) :
-  aveval m I a = aeval m a.
-Proof.
-  induction a; simpls; f_equal~.
-Qed.
+Notation "'|=' P" := (valid_assrt P%A) (at level 50).
 
 Fixpoint bexp_to_assrt b : assrt :=
   match b with
   | BVal b => AssrtVal b
   | BNot b => AssrtNot (bexp_to_assrt b)
-  | BAnd b1 b2 => AssrtAnd (bexp_to_assrt b1) (bexp_to_assrt b2)
-  | BOr  b1 b2 => AssrtOr (bexp_to_assrt b1) (bexp_to_assrt b2)
-  | BImp b1 b2 => AssrtImp (bexp_to_assrt b1) (bexp_to_assrt b2)
+  | BAnd b1 b2 => (bexp_to_assrt b1 /\ bexp_to_assrt b2)%A
+  | BOr  b1 b2 => (bexp_to_assrt b1 \/ bexp_to_assrt b2)%A
+  | BImp b1 b2 => (bexp_to_assrt b1 -> bexp_to_assrt b2)%A
   | BEqB b1 b2 => AssrtEqB (bexp_to_assrt b1) (bexp_to_assrt b2)
   | BEqA a1 a2 => AssrtEqA a1 a2
-  | BLt  a1 a2 => AssrtLt a1 a2
-  | BLeq a1 a2 => AssrtLeq a1 a2
+  | BLt  a1 a2 => (a1 < a2)%A
+  | BLeq a1 a2 => (a1 <= a2)%A
   end.
 
 Coercion bexp_to_assrt : bexp >-> assrt.
 
 Lemma bexp_assrt_equiv m I (b : bexp) :
-  sat m I b <-> beval m b.
+  m,I |= b <-> beval m b.
 Proof.
   induction b; simpls.
   - reflexivity.
@@ -438,7 +451,7 @@ Definition aexpv_isubst (i : ivar) (a' : aexpv) : aexpv -> aexpv :=
     end. 
 
 Definition assrt_subst (x : varid) (a : aexpv) (H : ~ has_ivars a) : assrt -> assrt :=
-  fix rec (P : assrt) :=
+  fix rec (P : assrt) : assrt :=
     match P with
     | AssrtVal b => AssrtVal b
     | AssrtNot P => AssrtNot (rec P)
@@ -481,7 +494,7 @@ Proof.
 Qed.
 
 Lemma aexpv_isubst_equiv m I i a n : 
-  aveval m I (aexpv_isubst i (AvVal n) a) = aveval m (I[i=n]) a.
+  aveval m I (aexpv_isubst i n a) = aveval m (I[i=n]) a.
 Proof.
   induction a; simpls; auto; try math.
   + case_if; simpls.
@@ -490,7 +503,7 @@ Proof.
 Qed.
 
 Lemma assrt_subst_equiv m I x n P H :
-  sat m I (assrt_subst x n H P) <-> sat (m[x=n]) I P.
+  m,I |= assrt_subst x n H P <-> m[x=n],I |= P.
 Proof.
   generalize dependent n. 
   generalize dependent I. 
@@ -536,7 +549,7 @@ Proof.
 Qed.
 
 Lemma assrt_isubst_equiv m I i n P H :
-  sat m I (assrt_isubst i n H P) <-> sat m (I[i=n]) P.
+  m,I |= assrt_isubst i n H P <-> m,I[i=n] |= P.
 Proof.
   generalize dependent n. 
   generalize dependent I. 
@@ -597,8 +610,8 @@ Qed.
 
 (* Winskel Ex6.6 *)
 Corollary assrt_isubst_forall_equiv m I i P :
-  sat m I (AssrtForall i P) <->
-  forall (n:int) H, sat m I (assrt_isubst i n H P).
+  m,I |= AssrtForall i P <->
+  forall (n:int) H, m,I |= assrt_isubst i n H P.
 Proof.
   simpls. split; intros.
   - apply assrt_isubst_equiv. apply H.
@@ -609,8 +622,8 @@ Qed.
 
 (* Winskel Ex6.6 *)
 Corollary assrt_isubst_exists_equiv m I i P :
-  sat m I (AssrtExists i P) <->
-  exists (n:int) H, sat m I (assrt_isubst i n H P).
+  m,I |= AssrtExists i P <->
+  exists (n:int) H, m,I |= assrt_isubst i n H P.
 Proof.
   simpls. splits; intros.
   - destruct H. rewrite <- assrt_isubst_equiv in H.
@@ -640,11 +653,16 @@ Proof.
 Qed.
 
 
+Notation "P '[' a '/' x ']'" := 
+  (assrt_subst x _ (aexp_no_ivars a) P)
+  (at level 10, a at level 5).
+
+
 Lemma assrt_subst_compat P :
   forall m I x a b,
   aeval m a = aeval m b ->
-  (m,I |= assrt_subst x _ (aexp_no_ivars a) P <->
-  m,I |= assrt_subst x _ (aexp_no_ivars b) P).
+  (m,I |= P[a/x] <->
+  m,I |= P[b/x]).
 Proof.
   induction P; simpls; intros.
   - easy.
@@ -711,7 +729,7 @@ Proof. auto. Qed.
 
 Corollary subst_val P :
   forall m I x a,
-  m,I |= assrt_subst x _ (aexp_no_ivars a) P <->
+  m,I |= P[a/x] <->
   m,I |= assrt_subst x _ (@val_no_ivars (aeval m a)) P.
 Proof.
   intros.
@@ -722,12 +740,36 @@ Qed.
 
 End Assertions.
 
-Notation "m ',' I '|=' P" := (sat m I P) (at level 50).
-Notation "'|=' P" := (valid_assrt P) (at level 50).
+
+Notation "P '[' a '/' x ']'" := 
+  (assrt_subst x _ (aexp_no_ivars a) P)
+  (at level 10, a at level 5).
+
+
+Delimit Scope assrt_scope with A.
+
+Notation "m ',' I '|=' P" := (sat m I P%A) (at level 50).
+Notation "'|=' P" := (valid_assrt P%A) (at level 50).
+
+(*Notation "P /\ Q" := (AssrtAnd P Q) (only parsing) : assrt_scope.*)
+
+Infix "/\" := AssrtAnd : assrt_scope.
+Infix "\/" := AssrtOr : assrt_scope.
+Infix "->" := AssrtImp : assrt_scope.
+Infix "<" := AssrtLt : assrt_scope.
+Infix "<=" := AssrtLeq : assrt_scope.
+Notation "'~' P" := (AssrtNot P) (at level 75, right associativity) : assrt_scope.
+
+Notation "'For' i '.' P" :=
+  (AssrtForall i P)
+  (at level 200, right associativity, only parsing) : assrt_scope.
+
+Notation "'Ex' i '.' P" :=
+  (AssrtExists i P)
+  (at level 200, right associativity, only parsing) : assrt_scope.
+
 
 Section SatRules.
-
-Coercion AssrtVal : bool >-> assrt.
 
 Lemma sat_true m I :
   m,I |= true.
@@ -736,37 +778,38 @@ Proof.
 Qed.
 
 Lemma sat_neg m I P :
-  ~ m,I |= P <-> m,I |= AssrtNot P.
+  ~ (m,I |= P) <-> m,I |= ~ P.
 Proof.
   now simpls.
 Qed.
 
 Lemma sat_and m I P1 P2 :
-  (m,I |= P1 /\ m,I |= P2) <-> m,I |= AssrtAnd P1 P2.
+  (m,I |= P1 /\ m,I |= P2) <-> m,I |= (P1 /\ P2).
 Proof.
   simpls. split; auto.
 Qed.
 
 Lemma sat_or m I P1 P2 :
-  (m,I |= P1 \/ m,I |= P2) <-> m,I |= AssrtOr P1 P2.
+  (m,I |= P1 \/ m,I |= P2) <-> m,I |= (P1 \/ P2).
 Proof.
   simpls. split; intros; auto.
 Qed.
 
 Lemma sat_imp m I P1 P2 :
-  (m,I |= P1 -> m,I |= P2) <->  m,I |= AssrtImp P1 P2.
+  (m,I |= P1 -> m,I |= P2) <-> m,I |= (P1 -> P2).
 Proof.
   simpls. split; intros; auto.
 Qed.
 
 Lemma sat_forall m i I P :
-  (forall n, m, I[i=n] |= P) <-> m,I |= AssrtForall i P.
+  (forall n, m, I[i=n] |= P) <->
+  m,I |= (For i. P).
 Proof.
   simpls. split; intros; auto.
 Qed.
 
 Lemma sat_exists m i I P :
-  (exists n, m, I[i=n] |= P) <-> m,I |= AssrtExists i P.
+  (exists n, m, I[i=n] |= P) <-> m,I |= Ex i. P.
 Proof.
   simpls. 
   split. trivial. trivial.
@@ -784,14 +827,14 @@ Proof.
   simpls. split; auto. apply prop_ext. intros. rewrite H. easy.
 Qed.
 
-Lemma sat_lt m I a1 a2 :
-  (aveval m I a1 < aveval m I a2) <-> m,I |= AssrtLt a1 a2.
+Lemma sat_lt m I (a1 a2 : aexpv) :
+  lt (aveval m I a1) (aveval m I a2) <-> m,I |= (a1 < a2).
 Proof.
   simpls. split; auto.
 Qed.
 
 Lemma sat_leq m I a1 a2 :
-  (aveval m I a1 <= aveval m I a2) <-> m,I |= AssrtLeq a1 a2.
+  le (aveval m I a1) (aveval m I a2) <-> m,I |= (a1 <= a2).
 Proof.
   simpls. split; auto.
 Qed.
@@ -801,20 +844,20 @@ End SatRules.
 Section ValidRules.
 
 Lemma valid_ex_falso Q :
-  |= AssrtImp false Q.
+  |= (false -> Q).
 Proof.
   introv. now simpls.
 Qed.
 
 Lemma valid_imp_refl P :
-  |= AssrtImp P P.
+  |= (P -> P).
 Proof.
   introv. easy.
 Qed.
 
 Lemma valid_imp_and_l P Q R :
-  |= AssrtImp P R ->
-  |= AssrtImp (AssrtAnd P Q) R.
+  |= (P -> R) ->
+  |= (P /\ Q -> R).
 Proof.
   introv ??.
   specializes H m I.
@@ -834,46 +877,60 @@ Definition triple m I c P Q :=
 Definition valid_triple c P Q :=
   forall m I, triple m I c P Q.
 
-Reserved Notation "'|-' c ':' P '=>' Q" (at level 5, no associativity).
+Notation "'||=' c ':' P '=>' Q" := (valid_triple c P%A Q%A)
+  (at level 50, c at next level, no associativity).
+
+Reserved Notation "'|-' c ':' P '=>' Q" 
+  (at level 50, c at next level, no associativity).
 
 Inductive derivable_triple : cmd -> assrt -> assrt -> Prop :=
   (* Structural rules *)
   | HL_CSQ c P Q P' Q'
-      (H1 : |= AssrtImp P P') (H2 : derivable_triple c P' Q') (H3 : |= AssrtImp Q' Q) :
-      derivable_triple c P Q
+    (H1 : |= (P->P')) (H2 : |- c : P' => Q') (H3 : |= (Q'->Q)) :
+    |- c : P => Q
   | HL_Case c P Q P'
-      (H1 : derivable_triple c (AssrtAnd P P') Q) 
-      (H2 : derivable_triple c (AssrtAnd P (AssrtNot P')) Q) :
-      derivable_triple c P Q
+    (H1 : |- c : P /\ P' => Q) 
+    (H2 : |- c : P /\ ~ P' => Q) :
+    |- c : P => Q
   (* Symbolic execution rules *)
   | HL_Skip P : 
-      derivable_triple CSkip P P
+    |- CSkip : P => P
   | HL_Assn x (a : aexp) P :
-      derivable_triple (CAssn x a) (assrt_subst x a (aexp_no_ivars a) P) P
+    |- CAssn x a : P[a/x] => P
   | HL_Seq c c' P Q R
-      (H1 : derivable_triple c P Q) (H2 : derivable_triple c' Q R) :
-      derivable_triple (CSeq c c') P R
+    (H1 : |- c : P => Q) (H2 : |- c' : Q => R) :
+    |- CSeq c c' : P => R
   | HL_IfTrue (b:bexp) c c' P Q
-      (H : derivable_triple c (AssrtAnd P b) Q) :
-      derivable_triple (CIf b c c') (AssrtAnd P b) Q
+    (H : |- c : P /\ b => Q) :
+    |- CIf b c c' : P /\ b => Q
   | HL_IfFalse (b:bexp) c c' P Q
-      (H : derivable_triple c (AssrtAnd P (AssrtNot b)) Q) :
-      derivable_triple (CIf b c c') (AssrtAnd P (AssrtNot b)) Q
+    (H : |- c : P /\ ~ b => Q) :
+    |- CIf b c c' : P /\ ~ b => Q
   | HL_WhileTrue (b:bexp) c P Q
-      (H : derivable_triple (CSeq c (CWhile b c)) (AssrtAnd P b) Q) :
-      derivable_triple (CWhile b c) (AssrtAnd P b) (AssrtAnd Q (AssrtNot b))
+    (H : |- CSeq c (CWhile b c) : P /\ b => Q) :
+    |- CWhile b c : P /\ b => (Q /\ ~ b)
   | HL_WhileFalse (b:bexp) c P :
-      derivable_triple (CWhile b c) (AssrtAnd P (AssrtNot b)) (AssrtAnd P (AssrtNot b)).
+    |- CWhile b c : P /\ ~ b => (P /\ ~ b)
+where "'|-' c ':' P '=>' Q" := 
+  (derivable_triple c P%A Q%A).
+
 
 End Triples.
+
+Notation "'|-' c ':' P '=>' Q" := (derivable_triple c P%A Q%A)
+  (at level 50, c at next level, no associativity).
+
+Notation "'||=' c ':' P '=>' Q" := (valid_triple c P%A Q%A)
+  (at level 50, c at next level, no associativity).
+
 
 Section Soundness.
 
 Lemma csq_sound c P Q P' Q' 
-  (H1 : |= AssrtImp P P')
-  (H2 : valid_triple c P' Q') 
-  (H3 : |= AssrtImp Q' Q) 
-  : valid_triple c P Q.
+  (H1 : |= (P -> P'))
+  (H2 : ||= c : P' => Q') 
+  (H3 : |= (Q' -> Q)) 
+  : ||= c : P => Q.
 Proof.
   unfolds valid_triple, triple, valid_assrt.
   intros.
@@ -887,9 +944,9 @@ Proof.
 Qed.
 
 Lemma case_sound c P Q P' 
-  (H1 : valid_triple c (AssrtAnd P P') Q) 
-  (H2 : valid_triple c (AssrtAnd P (AssrtNot P')) Q) 
-  : valid_triple c P Q.
+  (H1 : ||= c : P /\ P' => Q) 
+  (H2 : ||= c : P /\ ~ P' => Q) 
+  : ||= c : P => Q.
 Proof.
   unfolds valid_triple, triple, valid_assrt.
   intros.
@@ -903,7 +960,7 @@ Proof.
     specializes~ H2 H0.
 Qed.
 
-Lemma skip_sound P : valid_triple CSkip P P.
+Lemma skip_sound P : ||= CSkip : P => P.
 Proof.
   unfolds valid_triple, triple, valid_assrt.
   intros. unfolds yields.
@@ -913,8 +970,7 @@ Proof.
 Qed.
 
 Lemma assn_sound x a P : 
-  valid_triple (CAssn x a) 
-    (assrt_subst x _ (aexp_no_ivars a) P) P.
+  ||= CAssn x a : P[a/x] => P.
 Proof.
   unfolds valid_triple, triple, valid_assrt.
   intros. unfolds in H0.
@@ -927,9 +983,9 @@ Proof.
 Qed.
 
 Lemma seq_sound c c' P Q R :
-  valid_triple c P Q ->
-  valid_triple c' Q R ->
-  valid_triple (CSeq c c') P R.
+  ||= c : P => Q ->
+  ||= c' : Q => R ->
+  ||= CSeq c c' : P => R.
 Proof.
   unfolds valid_triple, triple, valid_assrt.
   intros.
@@ -941,7 +997,7 @@ Qed.
 
 
 Lemma false_rule_derivable c Q :
-  derivable_triple c (AssrtVal false) Q.
+  |- c : false => Q.
 Proof.
   generalize dependent Q; induction c; intros.
   - apply HL_CSQ with (P':=false) (Q':=false).
@@ -981,8 +1037,8 @@ Proof.
         + (* UH OH! Do we need cyclic proofs? *)
     *)
     apply HL_CSQ with 
-      (P':=(AssrtAnd false (AssrtNot e)))
-      (Q':=(AssrtAnd false (AssrtNot e))).
+      (P':=(false /\ ~ e)%A)
+      (Q':=(false /\ ~ e)%A).
     * apply valid_ex_falso.
     * apply HL_WhileFalse.
     * apply valid_imp_and_l, valid_ex_falso.
