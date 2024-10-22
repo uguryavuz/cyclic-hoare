@@ -904,7 +904,7 @@ Inductive derivable_triple : cmd -> assrt -> assrt -> Prop :=
     (H : |- c : P /\ b => Q) :
     |- CIf b c c' : P /\ b => Q
   | HL_IfFalse (b:bexp) c c' P Q
-    (H : |- c : P /\ ~ b => Q) :
+    (H : |- c' : P /\ ~ b => Q) :
     |- CIf b c c' : P /\ ~ b => Q
   | HL_WhileTrue (b:bexp) c P Q
     (H : |- CSeq c (CWhile b c) : P /\ b => Q) :
@@ -914,7 +914,6 @@ Inductive derivable_triple : cmd -> assrt -> assrt -> Prop :=
 where "'|-' c ':' P '=>' Q" := 
   (derivable_triple c P%A Q%A).
 
-
 End Triples.
 
 Notation "'|-' c ':' P '=>' Q" := (derivable_triple c P%A Q%A)
@@ -922,7 +921,6 @@ Notation "'|-' c ':' P '=>' Q" := (derivable_triple c P%A Q%A)
 
 Notation "'||=' c ':' P '=>' Q" := (valid_triple c P%A Q%A)
   (at level 50, c at next level, no associativity).
-
 
 Section Soundness.
 
@@ -994,7 +992,46 @@ Proof.
   specializes H m I.
 Qed.
 
+Lemma if_true_sound (b:bexp) c c' P Q :
+  ||= c : P /\ b => Q ->
+  ||= CIf b c c' : P /\ b => Q.
+Proof.
+  unfolds valid_triple, triple, valid_assrt.
+  intros.
+  simpls.
+  unfolds in H1.
+  exists* H1. sort.
+  assert (H2 : beval m b) by (destruct H0; now rewrite bexp_assrt_equiv in H2).
+  inverts H1. inverts H3. 2 : contradiction.
+  specializes H H0. 
+  assert (H3 : yields c'0 m'0 m') by (unfolds; exists~ n0).
+  specializes~ H H3.
+Qed.
 
+Lemma if_false_sound (b:bexp) c c' P Q :
+  ||= c' : P /\ ~ b => Q ->
+  ||= CIf b c c' : P /\ ~ b => Q.
+Proof.
+  unfolds valid_triple, triple, valid_assrt.
+  intros.
+  simpls.
+  unfolds in H1.
+  exists* H1. sort.
+  assert (H2 : ~ beval m b) by (destruct H0; now rewrite bexp_assrt_equiv in H2).
+  inverts H1. inverts H3. contradiction.
+  specializes H H0.
+  assert (H3 : yields c'0 m'0 m') by (unfolds; exists~ n0).
+  specializes~ H H3.
+Qed.
+
+Lemma while_true_sound (b:bexp) c P Q :
+  ||= CSeq c (CWhile b c) : P /\ b => Q ->
+  ||= CWhile b c : P /\ b => (Q /\ ~ b).
+Admitted.
+
+End Soundness.
+
+Section DerivedRules.
 
 Lemma false_rule_derivable c Q :
   |- c : false => Q.
@@ -1021,30 +1058,15 @@ Proof.
     * apply valid_ex_falso.
     * apply HL_Assn with (a:=e) (x:=x) (P:=false).
     * apply valid_ex_falso.
-  - (* Blooper reel: 
-      apply HL_Case with (P':=(bexp_to_assrt e)).
-      apply HL_CSQ with 
-        (P:=AssrtAnd (AssrtVal false) (bexp_to_assrt e)) 
-        (P':=AssrtAnd (AssrtVal false) (bexp_to_assrt e)) 
-        (Q:=Q) (Q':=AssrtAnd Q (AssrtNot (bexp_to_assrt e))).
-      * introv. apply sat_imp. trivial.
-      * apply HL_WhileTrue. apply HL_Seq with (Q:=(AssrtVal false)).
-        apply HL_CSQ with 
-          (P:=AssrtAnd (AssrtVal false) (bexp_to_assrt e)) (P':=(AssrtVal false)) (Q:=(AssrtVal false)) (Q':=(AssrtVal false)).
-        + introv. apply sat_imp. apply sat_and.
-        + apply IHc.
-        + introv. apply sat_imp. trivial.
-        + (* UH OH! Do we need cyclic proofs? *)
-    *)
-    apply HL_CSQ with 
+  - apply HL_CSQ with 
       (P':=(false /\ ~ e)%A)
       (Q':=(false /\ ~ e)%A).
     * apply valid_ex_falso.
     * apply HL_WhileFalse.
     * apply valid_imp_and_l, valid_ex_falso.
 Qed.
-    
-End Soundness.
+
+End DerivedRules.
 
 Section Example.
 
