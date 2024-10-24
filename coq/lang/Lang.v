@@ -1,5 +1,6 @@
 Set Implicit Arguments.
 Import SigTNotations.
+Require Import Init.Wf Arith.
 From Lang Require Import Util.
 
 Open Scope fmap_scope.
@@ -227,6 +228,22 @@ Proof.
   split. 
   exists~ n1. 
   exists~ n2.
+Qed.
+
+Lemma while_multistep_termination :
+  forall (n : nat) (b : bexp) c m m',
+    multistep (CWhile b c) m CSkip m' n
+      -> ~ beval m' b.
+Proof.
+  induction n using (well_founded_induction lt_wf).
+  introv H1.
+  inverts H1.
+  inverts H0. 2 : {inverts~ H'. cstep_skip. }
+  apply seq_intermediate_multistep in H'.
+  exists* H'.
+  apply H in H'0.
+  trivial.
+  math.
 Qed.
 
 End Language.
@@ -1024,12 +1041,125 @@ Proof.
   specializes~ H H3.
 Qed.
 
+(* Lemma while_multistep_termination :
+  forall (n : nat) (b : bexp) c m m',
+    multistep (CWhile b c) m CSkip m' n
+      -> ~ beval m' b.
+Proof.
+  induction n using (well_founded_induction lt_wf).
+  introv H1.
+  inverts H1.
+  inverts H0. 2 : {inverts~ H'. cstep_skip. }
+  apply seq_intermediate_multistep in H'.
+  exists* H'.
+  apply H in H'0.
+  trivial.
+  math.
+Qed. *)
+
+(* Lemma helper :
+  forall (n : nat) (b : bexp) c m m' I P Q,
+    m,I |= (P /\ b) ->
+    multistep (CWhile b c) m CSkip m'  *)
+
+Lemma multistep_while_true_sound (n : nat) (b : bexp) c I P Q :
+  (forall m m',
+    multistep (CSeq c (CWhile b c)) m CSkip m' n ->
+    m,I |= (P /\ b) ->
+    m',I |= Q) ->
+  (forall m m' (n' : nat),
+    n' < n ->
+    multistep (CWhile b c) m CSkip m' n' ->
+    m,I |= (P /\ b) ->
+    m',I |= Q).
+Proof.
+  induction n using (well_founded_induction lt_wf).
+  intros.
+  inverts H1.
+  inverts H3.
+  admit.
+  (* 2 : { 
+    inverts H'. 
+    contradict Hg. 
+    rewrite <- sat_and in H2. 
+    destruct H2. 
+    rewrite <- bexp_assrt_equiv. apply H2. 
+    cstep_skip.
+  }
+  admit. *)
+Admitted.
+
 Lemma while_true_sound (b:bexp) c P Q :
   ||= CSeq c (CWhile b c) : P /\ b => Q ->
   ||= CWhile b c : P /\ b => (Q /\ ~ b).
-Admitted.
+Proof.
+  introv H1 H2 H3.
+  rewrite <- sat_and.
+  split.
+  2 : {
+    simpls.
+    rewrite bexp_assrt_equiv.
+    inverts H3.
+    now apply while_multistep_termination in H.
+  }
+  inverts H3.
+  pose proof multistep_while_true_sound.
+  unfolds in H1.
+  unfold triple in H1.
+  specializes H0 b c I P Q.
+  specializes H0.
+  {
+    intros.
+    specializes H1 m0 I m'0.
+    eapply H1.
+    apply H3.
+    exists.
+    apply H0.
+  }
+  intros.
+  eapply H1.
+  apply H3.
+  exists.
+  apply H0.
+  apply H.
+  apply H2.
+  easy.
+Qed.
+
+Lemma while_false_sound (b:bexp) c P :
+  ||= CWhile b c : P /\ ~ b => (P /\ ~ b).
+Proof.
+  introv H1 H2.
+  inverts H2.
+  inverts H.
+  inverts H0.
+  2 : { inverts~ H'. cstep_skip. }
+  apply sat_and in H1.
+  destruct H1.
+  simpls.
+  contradict H0.
+  apply bexp_assrt_equiv.
+  trivial.
+Qed.
+
+Lemma soundness c P Q :
+  |- c : P => Q -> ||= c : P => Q.
+Proof.
+  introv H. induction H; simpls.
+  - eapply csq_sound; eauto.
+  - applys case_sound IHderivable_triple1 IHderivable_triple2.
+  - apply skip_sound. 
+  - apply assn_sound.
+  - eapply seq_sound; eauto.
+  - eapply if_true_sound; eauto.
+  - eapply if_false_sound; eauto.
+  - eapply while_true_sound; eauto.
+  - eapply while_false_sound; eauto.
+Qed.
 
 End Soundness.
+
+Print Assumptions soundness.
 
 Section DerivedRules.
 
