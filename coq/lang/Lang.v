@@ -1041,54 +1041,6 @@ Proof.
   specializes~ H H3.
 Qed.
 
-(* Lemma while_multistep_termination :
-  forall (n : nat) (b : bexp) c m m',
-    multistep (CWhile b c) m CSkip m' n
-      -> ~ beval m' b.
-Proof.
-  induction n using (well_founded_induction lt_wf).
-  introv H1.
-  inverts H1.
-  inverts H0. 2 : {inverts~ H'. cstep_skip. }
-  apply seq_intermediate_multistep in H'.
-  exists* H'.
-  apply H in H'0.
-  trivial.
-  math.
-Qed. *)
-
-(* Lemma helper :
-  forall (n : nat) (b : bexp) c m m' I P Q,
-    m,I |= (P /\ b) ->
-    multistep (CWhile b c) m CSkip m'  *)
-
-Lemma multistep_while_true_sound (n : nat) (b : bexp) c I P Q :
-  (forall m m',
-    multistep (CSeq c (CWhile b c)) m CSkip m' n ->
-    m,I |= (P /\ b) ->
-    m',I |= Q) ->
-  (forall m m' (n' : nat),
-    n' < n ->
-    multistep (CWhile b c) m CSkip m' n' ->
-    m,I |= (P /\ b) ->
-    m',I |= Q).
-Proof.
-  induction n using (well_founded_induction lt_wf).
-  intros.
-  inverts H1.
-  inverts H3.
-  admit.
-  (* 2 : { 
-    inverts H'. 
-    contradict Hg. 
-    rewrite <- sat_and in H2. 
-    destruct H2. 
-    rewrite <- bexp_assrt_equiv. apply H2. 
-    cstep_skip.
-  }
-  admit. *)
-Admitted.
-
 Lemma while_true_sound (b:bexp) c P Q :
   ||= CSeq c (CWhile b c) : P /\ b => Q ->
   ||= CWhile b c : P /\ b => (Q /\ ~ b).
@@ -1102,28 +1054,20 @@ Proof.
     inverts H3.
     now apply while_multistep_termination in H.
   }
-  inverts H3.
-  pose proof multistep_while_true_sound.
   unfolds in H1.
   unfold triple in H1.
-  specializes H0 b c I P Q.
-  specializes H0.
-  {
-    intros.
-    specializes H1 m0 I m'0.
-    eapply H1.
-    apply H3.
-    exists.
-    apply H0.
+  assert (H4 : beval m b). {
+    destruct H2.
+    now rewrite bexp_assrt_equiv in H0.  
   }
-  intros.
-  eapply H1.
-  apply H3.
-  exists.
-  apply H0.
-  apply H.
-  apply H2.
-  easy.
+  assert (H5 : yields (CSeq c (CWhile b c)) m m'). {
+    unfolds. 
+    inverts H3.
+    inverts H.
+    inverts H0. 2 : { contradiction. }
+    exists~ n.
+  }
+  specializes H1 m I H2.
 Qed.
 
 Lemma while_false_sound (b:bexp) c P :
