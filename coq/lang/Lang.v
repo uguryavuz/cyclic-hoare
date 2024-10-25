@@ -884,6 +884,9 @@ Qed.
 End ValidRules.
 
 
+Hint Resolve valid_imp_refl : core.
+
+
 Section Triples.
 
 Definition triple m I c P Q :=
@@ -1133,9 +1136,114 @@ Proof.
     * apply valid_imp_and_l, valid_ex_falso.
 Qed.
 
+Lemma HL_CSQ_L c P Q P' :
+  |= (P->P') ->
+  |- c : P' => Q ->
+  |- c : P => Q.
+Proof.
+  intros.
+  now apply HL_CSQ with (P':=P') (Q':=Q).
+Qed.
+
+Lemma HL_CSQ_R c P Q Q' :
+  |- c : P => Q' ->
+  |= (Q'->Q) ->
+  |- c : P => Q.
+Proof.
+  intros.
+  now apply HL_CSQ with (P':=P) (Q':=Q').
+Qed.
+
+Lemma HL_Skip' P Q :
+  |= (P -> Q) ->
+  |- CSkip : P => Q.
+Proof.
+  intros. applys HL_CSQ_L H.
+  apply HL_Skip.
+Qed.
+
+Lemma HL_Assn' x a P Q :
+  |= (P -> Q[a/x]) ->
+  |- CAssn x a : P => Q.
+Proof.
+  intros. applys HL_CSQ_L H.
+  apply HL_Assn.
+Qed.
+
+Lemma HL_IfTrue' (b:bexp) c c' P Q :
+  |= (P -> b) ->
+  |- c : P /\ b => Q ->
+  |- CIf b c c' : P => Q.
+Proof.
+  intros. assert (|= (P -> P /\ b)).
+  { unfolds. intros. simpls.
+    intros. splits~.
+    apply~ H. }
+  applys HL_CSQ_L H1.
+  apply~ HL_IfTrue.
+Qed.
+
+Lemma HL_IfFalse' (b:bexp) c c' P Q :
+  |= (P -> ~ b) ->
+  |- c' : P /\ ~ b => Q ->
+  |- CIf b c c' : P => Q.
+Proof.
+  intros. assert (|= (P -> P /\ ~b)).
+  { unfolds. intros. simpls.
+    intros. splits~.
+    apply~ H. }
+  applys HL_CSQ_L H1.
+  apply~ HL_IfFalse.
+Qed.
+
+Lemma HL_If (b:bexp) c c' P Q :
+  |- c : P /\ b => Q ->
+  |- c' : P /\ ~ b => Q ->
+  |- CIf b c c' : P => Q.
+Proof.
+  intros.
+  apply HL_Case with (P':=b).
+  apply~ HL_IfTrue.
+  apply~ HL_IfFalse.
+Qed.
+
+Lemma HL_WhileTrue' (b:bexp) c P Q :
+  |= (P -> b) ->
+  |- CSeq c (CWhile b c) : P /\ b => Q ->
+  |- CWhile b c : P => Q.
+Proof.
+  intros. assert (|= (P -> P /\ b)).
+  { unfolds. intros. simpls.
+    intros. splits~.
+    apply~ H. }
+  assert (|= (Q /\ ~b -> Q)).
+  { apply~ valid_imp_and_l. }
+  applys HL_CSQ H1 H2.
+  apply~ HL_WhileTrue.
+Qed.
+
+Lemma HL_WhileFalse' (b:bexp) c P Q :
+  |= (P -> ~b) ->
+  |= (P -> Q) ->
+  |- CWhile b c : P => Q.
+Proof.
+  intros. assert (|= (P -> P /\ ~b)).
+  { unfolds. intros. simpls.
+    intros. splits~.
+    apply~ H. }
+  assert (|= (P /\ ~b -> Q)).
+  { apply~ valid_imp_and_l. }
+  applys HL_CSQ H1 H2.
+  apply~ HL_WhileFalse.
+Qed.
+
 End DerivedRules.
 
 Section Example.
+
+Notation "c1 ;; c2" := (CSeq c1 c2) (at level 39, right associativity).
+Notation "x @@ z w" := (x (z w)) (at level 38, right associativity, only parsing).
+Notation "# n" := (AVal n) (at level 5).
 
 Local Definition c1 : cmd :=
   CAssn "x" (AMul (AVal 5) (AVal 10)).
@@ -1147,69 +1255,133 @@ Proof.
   repeat econstructor.
 Qed.
 
-Notation "c1 ;; c2" := (CSeq c1 c2) (at level 39, right associativity).
-Notation "x @@ z w" := (x (z w)) (at level 38, right associativity, only parsing).
-Notation "# n" := (AVal n) (at level 5).
+Local Lemma ex1_proof :
+  |- c1 : true => AssrtEqA (AVar "x") (AVal 50).
+Proof.
+  unfold c1.
+  apply HL_Assn'.
+  simpls. unfolds.
+  intros. simpls. intros.
+  case_if~.
+Qed.
+
 
 Local Definition c2 : cmd :=
-  CAssn "x" #1 ;;
+  (*CAssn "x" #n ;;*)
   CAssn "i" #3 ;;
   CWhile (BLt #0 (AVar "i"))
   (CAssn "x" (AMul (AVar "x") #2);;
    CAssn "i" (ASub (AVar "i") #1)).
 
 Local Lemma ex2_eval m :
-  yields c2 m (m["x"=8]["i"=0]).
+  yields c2 m (m["x"=8*m "x"]["i"=0]).
 Proof.
   econstructor.
   econstructor. econstructor. econstructor.
   simpls. econstructor.
   apply StepSeqSkip. econstructor.
-  econstructor. econstructor.
-  econstructor. apply StepSeqSkip.
-  econstructor. econstructor.
-  simpls. unfolds upd. case_if.
-  constructor. simpls.
+  econstructor.
+  simpls. now rewrite upd_read1.
   econstructor. repeat econstructor.
+  simpls. rewrite upd_read1_diff; [|discriminate].
+  remember (m "x") as x0.
   econstructor. econstructor.
-  apply StepSeqSkip. econstructor.
+  apply StepSeqSkip.
   econstructor. econstructor.
-  do 2 rewrite upd_shadow2.
+  econstructor. econstructor.
+  apply StepSeqSkip.
+  simpls. rewrite upd_shadow2, upd_read2; [|discriminate].
+  econstructor. econstructor.
+  simpls. now rewrite upd_read1.
+  econstructor. econstructor.
+  econstructor. econstructor.
+  simpls. rewrite upd_shadow2, upd_read2; [|discriminate].
+  econstructor. econstructor.
+  apply StepSeqSkip.
+  econstructor. econstructor.
+  econstructor. simpls.
+  rewrite upd_shadow2, upd_read2; [|discriminate].
   econstructor. apply StepSeqSkip.
   econstructor. econstructor.
-  simpls. unfold upd. repeat case_if.
-  constructor. simpls.
-  rewrite upd_shadow1.
-  do 2 (rewrite upd_read2; [|discriminate]).
+  simpls. now rewrite upd_read1.
   econstructor. econstructor.
   econstructor. econstructor.
+  simpls. rewrite upd_shadow2, upd_read2; [|discriminate].
   econstructor. econstructor.
-  apply StepSeqSkip. econstructor.
+  apply StepSeqSkip.
   econstructor. econstructor.
-  simpls.
-  do 2 (rewrite upd_read2; [|discriminate]).
-  rewrite upd_shadow2. rewrite upd_shadow1.
+  econstructor. simpls.
+  rewrite upd_shadow2, upd_read2; [|discriminate].
   econstructor. apply StepSeqSkip.
-  econstructor. econstructor.
-  simpls. rewrite upd_read1. constructor.
-  econstructor. econstructor.
-  econstructor. econstructor.
-  econstructor. econstructor.
-  apply StepSeqSkip. econstructor.
-  econstructor. econstructor.
-  simpls. 
-  do 2 (rewrite upd_read2; [|discriminate]).
-  rewrite upd_shadow2.
-  rewrite upd_shadow1.
-  econstructor. apply StepSeqSkip.
-  econstructor.
-  apply StepWhileFalse.
-  intro. inverts H.
-  rewrite upd_read1 in H1.
-  inverts H1.
-  econstructor.
+  econstructor. apply StepWhileFalse.
+  simpls. now rewrite upd_read1.
+  replace (x0*2*2*2) with (8*x0). 2: math.
+  replace (3-1-1-1) with 0. 2: math.
+  constructor.
 Qed.
 
+Notation EQ x n := (AssrtEqA (AVar x) #n).
+
+Lemma ex2_proof n :
+  |- c2 : 
+    EQ "x" n =>
+    (EQ "x" (8*n) /\ EQ "i" 0).
+Proof.
+  unfold c2.
+  apply HL_Seq with (Q:=(EQ "x" n /\ EQ "i" 3)%A).
+  { simpls. apply HL_Assn'.
+    introv ?. simpls.
+    case_if~. simpls. splits~.
+    case_if~. }
+  apply HL_WhileTrue'.
+  { simpls. introv (?&?).
+    simpls. math. }
+  apply HL_Seq with (Q:=(EQ "x" (n*2) /\ EQ "i" 2)%A).
+  { apply HL_Seq with (Q:=(EQ "x" (n*2) /\ EQ "i" 3)%A).
+    { apply HL_Assn'. simpls.
+      introv (?&?&?). simpls.
+      case_if~. simpls. splits~. math.
+      case_if~. simpls. math. }
+    apply HL_Assn'.
+    introv ?. simpls.
+    case_if~. simpls. splits~. math.
+    case_if~. simpls. math. }
+  
+  apply HL_WhileTrue'.
+  { simpls. introv (?&?).
+    simpls. math. }
+  apply HL_Seq with (Q:=(EQ "x" (n*4) /\ EQ "i" 1)%A).
+  { apply HL_Seq with (Q:=(EQ "x" (n*4) /\ EQ "i" 2)%A).
+    { apply HL_Assn'. simpls.
+      introv (?&?&?). simpls.
+      case_if~. simpls. splits~. math.
+      case_if~. simpls. math. }
+    apply HL_Assn'.
+    introv ?. simpls.
+    case_if~. simpls. splits~. math.
+    case_if~. simpls. math. }
+
+  apply HL_WhileTrue'.
+  { simpls. introv (?&?).
+    simpls. math. }
+  apply HL_Seq with (Q:=(EQ "x" (n*8) /\ EQ "i" 0)%A).
+  { apply HL_Seq with (Q:=(EQ "x" (n*8) /\ EQ "i" 1)%A).
+    { apply HL_Assn'. simpls.
+      introv (?&?&?). simpls.
+      case_if~. simpls. splits~. math.
+      case_if~. simpls. math. }
+    apply HL_Assn'.
+    introv ?. simpls.
+    case_if~. simpls. splits~. math.
+    case_if~. simpls. math. }
+
+  apply HL_WhileFalse'.
+  { introv (?&?). simpls. math. }
+  introv (?&?). simpls. math.
+Qed.
+
+
+    
 End Example.
 
 Section Interp.

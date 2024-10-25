@@ -1779,6 +1779,15 @@ Proof using.
   unfolds. case_if~. case_if~.
 Qed.
 
+Lemma upd_read1_diff m a a' b :
+  a <> a' ->
+  m[a'=b] a = m a.
+Proof.
+  intros.
+  unfolds.
+  case_if~.
+Qed.
+
 
 End TMap.
 
