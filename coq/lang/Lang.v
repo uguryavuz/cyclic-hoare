@@ -1041,33 +1041,28 @@ Proof.
   specializes~ H H3.
 Qed.
 
+Lemma yields_while_unroll b c m m' :
+  yields (CWhile b c) m m' ->
+  beval m b ->
+  yields (CSeq c (CWhile b c)) m m'.
+Proof.
+  intros. destruct H. inverts H.
+  inverts H1; [|contradiction].
+  exists~ n.
+Qed.
+
 Lemma while_true_sound (b:bexp) c P Q :
   ||= CSeq c (CWhile b c) : P /\ b => Q ->
   ||= CWhile b c : P /\ b => (Q /\ ~ b).
 Proof.
-  introv H1 H2 H3.
-  rewrite <- sat_and.
+  introv H1 H2 H3. simpls.
   split.
-  2 : {
-    simpls.
-    rewrite bexp_assrt_equiv.
+  - apply yields_while_unroll in H3.
+    applys H1 H2 H3. 
+    rewrite <- bexp_assrt_equiv. apply H2.
+  - rewrite bexp_assrt_equiv.
     inverts H3.
     now apply while_multistep_termination in H.
-  }
-  unfolds in H1.
-  unfold triple in H1.
-  assert (H4 : beval m b). {
-    destruct H2.
-    now rewrite bexp_assrt_equiv in H0.  
-  }
-  assert (H5 : yields (CSeq c (CWhile b c)) m m'). {
-    unfolds. 
-    inverts H3.
-    inverts H.
-    inverts H0. 2 : { contradiction. }
-    exists~ n.
-  }
-  specializes H1 m I H2.
 Qed.
 
 Lemma while_false_sound (b:bexp) c P :
