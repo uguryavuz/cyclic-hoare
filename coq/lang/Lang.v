@@ -1103,8 +1103,6 @@ Qed.
 
 End Soundness.
 
-Print Assumptions soundness.
-
 Section DerivedRules.
 
 Lemma false_rule_derivable c Q :
@@ -1125,7 +1123,7 @@ Proof.
     + apply HL_IfFalse.
       apply HL_CSQ with (P':=false) (Q':=Q).
       * apply valid_imp_and_l, valid_ex_falso.
-      * apply IHc1.
+      * apply IHc2.
       * apply valid_imp_refl.
   - pose proof (aexp_no_ivars e).
     apply HL_CSQ with (P':=false) (Q':=false).
