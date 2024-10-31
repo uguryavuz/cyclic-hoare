@@ -5,3 +5,6 @@
 -arg -hiding-delimiting-key,-implicit-core-hint-db
 Util.v
 Lang.v
+Assertions.v
+TriplesMeta.v
+Examples.v
