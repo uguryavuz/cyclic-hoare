@@ -618,6 +618,24 @@ Proof.
   introv ??. easy.
 Qed.
 
+Lemma valid_imp_disj_R P Q R :
+  |= (P -> Q) ->
+  |= (P -> (Q \/ R)).
+Proof.
+  introv ??.
+  simpls; left.
+  specializes H m I.
+Qed. 
+
+Lemma valid_imp_disj_L P Q R :
+  |= (P -> Q) ->
+  |= (P -> (R \/ Q)).
+Proof.
+  introv ??.
+  simpls; right.
+  specializes H m I.
+Qed.
+
 Lemma valid_imp_and_l P Q R :
   |= (P -> R) ->
   |= (P /\ Q -> R).
@@ -625,6 +643,23 @@ Proof.
   introv ??.
   specializes H m I.
   simpls. now apply H.
+Qed.
+
+Lemma valid_disj_imp P Q R :
+  |= (P -> R) ->
+  |= (Q -> R) ->
+  |= ((P \/ Q) -> R).
+Proof.
+  introv ??.
+  simpls. 
+  unfold valid_assrt in *.
+  intros.
+  specializes H m I.
+  specializes H0 m I.
+  rewrite <- sat_imp in *.
+  intros.
+  rewrite <- sat_or in H1.
+  destruct H1; auto.
 Qed.
 
 End ValidRules.
