@@ -611,6 +611,13 @@ Proof.
   introv. easy.
 Qed.
 
+Lemma valid_imp_taut P Q :
+  |= P ->
+  |= (Q -> P).
+Proof.
+  introv ??. easy.
+Qed.
+
 Lemma valid_imp_and_l P Q R :
   |= (P -> R) ->
   |= (P /\ Q -> R).
