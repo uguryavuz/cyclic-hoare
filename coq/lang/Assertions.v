@@ -262,6 +262,27 @@ Definition assrt_isubst (i : ivar) (a : aexpv) (_ : ~ has_ivars a) : assrt -> as
 Coercion AvVal : Z >-> aexpv.
 
 
+(*
+
+
+(* https://stackoverflow.com/questions/44034734/overloading-notation-for-different-types-in-coq *)
+Class Subst (ID S T : Type) := substT : ID -> S -> T -> T.
+
+Notation "P '[' a '/' x ']'" := 
+  (substT x a P)
+  (at level 10, a at level 5).
+
+Instance SubstAexpInAssrt  : Subst varid aexp assrt := 
+  fun x a P => assrt_subst x _ (aexp_no_ivars a) P.
+Instance SubstIntInAssrt   : Subst varid int assrt  := 
+  fun x n P => assrt_subst x _ (@val_no_ivars n) P.
+Instance SubstAexpvInAexpv : Subst varid aexpv aexpv := aexpv_subst.
+Instance SubstIntInAexpv   : Subst varid int aexpv   := aexpv_subst.
+
+
+*)
+
+
 Section SubstProperties.
 
 Lemma aexpv_subst_equiv m I x a n : 
