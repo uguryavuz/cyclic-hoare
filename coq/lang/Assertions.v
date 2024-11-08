@@ -19,6 +19,9 @@ Delimit Scope assrt_scope with A.
 Declare Scope aexpv_scope.
 Delimit Scope aexpv_scope with E.
 
+Declare Scope valid_scope.
+Delimit Scope valid_scope with V.
+
 Inductive aexpv :=
   | AvVal (n : int)
   | AvVar (x : varid)
@@ -106,12 +109,12 @@ Fixpoint sat m I P : Prop :=
   | AssrtExists i P => exists n, sat m (I[i=n]) P
   end.
 
-Notation "m ',' I '|=' P" := (sat m I P%A) (at level 50).
+Notation "m '+' I '|=' P" := (sat m I P%A) (at level 50) : valid_scope.
 
 Definition valid_assrt P :=
-  forall m I, m, I |= P.
+  forall m I, (m+I |= P)%V.
 
-Notation "'|=' P" := (valid_assrt P%A) (at level 50).
+Notation "'|=' P" := (valid_assrt P%A) (at level 50) : valid_scope.
 
 Fixpoint bexp_to_assrt b : assrt :=
   match b with
@@ -129,7 +132,7 @@ Fixpoint bexp_to_assrt b : assrt :=
 Coercion bexp_to_assrt : bexp >-> assrt.
 
 Lemma bexp_assrt_equiv m I (b : bexp) :
-  m,I |= b <-> beval m b.
+  (m+I |= b)%V <-> beval m b.
 Proof.
   induction b; simpls.
   - reflexivity.
@@ -304,7 +307,7 @@ Proof.
 Qed.
 
 Lemma assrt_subst_equiv m I x n P :
-  m,I |= P[n/x] <-> m[x=n],I |= P.
+  (m+I |= P[n/x])%V <-> (m[x=n]+I |= P)%V.
 Proof.
   generalize dependent n.
   generalize dependent I.
@@ -341,7 +344,7 @@ Proof.
 Qed.
 
 Lemma assrt_isubst_equiv m I i n P H :
-  m,I |= assrt_isubst i n H P <-> m,I[i=n] |= P.
+  (m+I |= assrt_isubst i n H P)%V <-> (m+I[i=n] |= P)%V.
 Proof.
   Set Printing Coercions.
   generalize dependent n. 
@@ -403,8 +406,8 @@ Qed.
 
 (* Winskel Ex6.6 *)
 Corollary assrt_isubst_forall_equiv m I i P :
-  m,I |= (For i. P) <->
-  forall (n:int), m,I |= assrt_isubst i _ (@val_no_ivars n) P.
+  (m+I |= (For i. P))%V <->
+  forall (n:int), (m+I |= assrt_isubst i _ (@val_no_ivars n) P)%V.
 Proof.
   simpls. split; intros.
   - apply assrt_isubst_equiv. apply H.
@@ -415,8 +418,8 @@ Qed.
 
 (* Winskel Ex6.6 *)
 Corollary assrt_isubst_exists_equiv m I i P :
-  m,I |= (Ex i. P) <->
-  exists (n:int), m,I |= assrt_isubst i _ (@val_no_ivars n) P.
+  (m+I |= (Ex i. P))%V <->
+  exists (n:int), (m+I |= assrt_isubst i _ (@val_no_ivars n) P)%V.
 Proof.
   simpls. splits; intros.
   - destruct H. rewrite <- assrt_isubst_equiv in H.
@@ -448,8 +451,8 @@ Qed.
 Lemma assrt_subst_compat P :
   forall m I x a b,
   aeval m a = aeval m b ->
-  (m,I |= P[a/x] <->
-  m,I |= P[b/x]).
+  (m+I |= P[a/x] <->
+  m+I |= P[b/x])%V.
 Proof.
   induction P; simpls; intros.
   - easy.
@@ -511,8 +514,8 @@ Qed.
 
 Corollary subst_val P :
   forall m I x a,
-  m,I |= P[a/x] <->
-  m,I |= P[(aeval m a)/x].
+  (m+I |= P[a/x])%V <->
+  (m+I |= P[(aeval m a)/x])%V.
 Proof.
   intros.
   pose proof assrt_subst_compat P m I x a (AVal (aeval m a)).
@@ -525,70 +528,72 @@ End SubstProperties.
 
 Section SatRules.
 
+Open Scope valid_scope.
+
 Lemma sat_true m I :
-  m,I |= true.
+  m+I |= true.
 Proof.
   easy.
 Qed.
 
 Lemma sat_neg m I P :
-  ~ (m,I |= P) <-> m,I |= ~P.
+  ~ (m+I |= P) <-> m+I |= ~P.
 Proof.
   now simpls.
 Qed.
 
 Lemma sat_and m I P1 P2 :
-  (m,I |= P1 /\ m,I |= P2) <-> m,I |= (P1 /\ P2).
+  (m+I |= P1 /\ m+I |= P2) <-> m+I |= (P1 /\ P2).
 Proof.
   simpls. split; auto.
 Qed.
 
 Lemma sat_or m I P1 P2 :
-  (m,I |= P1 \/ m,I |= P2) <-> m,I |= (P1 \/ P2).
+  (m+I |= P1 \/ m+I |= P2) <-> m+I |= (P1 \/ P2).
 Proof.
   simpls. split; intros; auto.
 Qed.
 
 Lemma sat_imp m I P1 P2 :
-  (m,I |= P1 -> m,I |= P2) <-> m,I |= (P1 -> P2).
+  (m+I |= P1 -> m+I |= P2) <-> m+I |= (P1 -> P2).
 Proof.
   simpls. split; intros; auto.
 Qed.
 
 Lemma sat_forall m i I P :
-  (forall n, m, I[i=n] |= P) <->
-  m,I |= (For i. P).
+  (forall n, m+I[i=n] |= P) <->
+  m+I |= (For i. P).
 Proof.
   simpls. split; intros; auto.
 Qed.
 
 Lemma sat_exists m i I P :
-  (exists n, m, I[i=n] |= P) <-> m,I |= Ex i. P.
+  (exists n, m+I[i=n] |= P) <-> m+I |= Ex i. P.
 Proof.
   simpls. 
   split. trivial. trivial.
 Qed.
 
 Lemma sat_eqa m I a1 a2 :
-  (aveval m I a1 = aveval m I a2) <-> m,I |= AssrtEqA a1 a2.
+  (aveval m I a1 = aveval m I a2) <-> m+I |= AssrtEqA a1 a2.
 Proof.
   simpls. split; auto.
 Qed.
 
 Lemma sat_eqb m I P Q :
-  (m,I |= P <-> m,I |= Q) <-> m,I |= AssrtEqB P Q.
+  (m+I |= P <-> m+I |= Q) <-> m+I |= AssrtEqB P Q.
 Proof.
   simpls. split; auto. apply prop_ext. intros. rewrite H. easy.
 Qed.
 
 Lemma sat_lt m I (a1 a2 : aexpv) :
-  lt (aveval m I a1) (aveval m I a2) <-> m,I |= (a1 < a2).
+  lt (aveval m I a1) (aveval m I a2) <-> m+I |= (a1 < a2).
 Proof.
   simpls. split; auto.
 Qed.
 
 Lemma sat_leq m I a1 a2 :
-  le (aveval m I a1) (aveval m I a2) <-> m,I |= (a1 <= a2).
+  le (aveval m I a1) (aveval m I a2) <-> m+I |= (a1 <= a2).
 Proof.
   simpls. split; auto.
 Qed.
@@ -598,6 +603,8 @@ End SatRules.
 
 
 Section ValidRules.
+
+Open Scope valid_scope.
 
 Lemma valid_ex_falso Q :
   |= (false -> Q).
@@ -669,12 +676,159 @@ Hint Resolve valid_imp_refl : core.
 
 
 Definition triple m I c P Q :=
-  m,I |= P ->
+  (m+I |= P)%V ->
   forall m', yields c m m' ->
-  m',I |= Q.
+  (m'+I |= Q)%V.
 
 Definition valid_triple c P Q :=
   forall m I, triple m I c P Q.
 
 Notation "'|=' c ':' P '=>' Q" := (valid_triple c P%A Q%A)
-  (at level 50, c at next level, no associativity).
+  (at level 50, c at next level, no associativity) : valid_scope.
+
+
+Section Soundness.
+
+Open Scope valid_scope.
+
+Lemma csq_sound c P Q P' Q' 
+  (H1 : |= (P -> P'))
+  (H2 : |= c : P' => Q') 
+  (H3 : |= (Q' -> Q)) 
+  : |= c : P => Q.
+Proof.
+  unfolds valid_triple, triple, valid_assrt.
+  intros.
+  specializes H1 m I.
+  simpls.
+  specializes H1 H.
+  specializes H2 H1.
+  specializes H2 H0.
+  apply H3.
+  trivial.
+Qed.
+
+Lemma case_sound c P Q P' 
+  (H1 : |= c : P /\ P' => Q) 
+  (H2 : |= c : P /\ ~ P' => Q) 
+  : |= c : P => Q.
+Proof.
+  unfolds valid_triple, triple, valid_assrt.
+  intros.
+  simpls.
+  specializes H1 m I.
+  specializes H2 m I.
+  destruct (classic (m+I |= P')).
+  + specializes H1 (conj H H3). 
+    specializes~ H1 H0.
+  + specializes H2 (conj H H3). 
+    specializes~ H2 H0.
+Qed.
+
+Lemma skip_sound P : |= CSkip : P => P.
+Proof.
+  unfolds valid_triple, triple, valid_assrt.
+  intros. unfolds yields.
+  destruct H0.
+  inverts~ H0.
+  cstep_skip.
+Qed.
+
+Lemma assn_sound x a P : 
+  |= CAssn x a : P[a/x] => P.
+Proof.
+  unfolds valid_triple, triple, valid_assrt.
+  intros. unfolds in H0.
+  exists* H0. sort.
+  inverts H0. inverts H1.
+  inverts H'. 2: cstep_skip.
+  assert (~ has_ivars (aeval m a)) as IV; auto.
+  apply assrt_subst_equiv.
+  simpls. now apply subst_val.
+Qed.
+
+Lemma seq_sound c c' P Q R :
+  |= c : P => Q ->
+  |= c' : Q => R ->
+  |= CSeq c c' : P => R.
+Proof.
+  unfolds valid_triple, triple, valid_assrt.
+  intros.
+  apply seq_intermediate_yields in H2.
+  destruct H2 as (m'' & H2 & H3).
+  specializes H m I.
+Qed.
+
+Lemma if_true_sound (b:bexp) c c' P Q :
+  |= c : P /\ b => Q ->
+  |= CIf b c c' : P /\ b => Q.
+Proof.
+  unfolds valid_triple, triple, valid_assrt.
+  intros.
+  simpls.
+  unfolds in H1.
+  exists* H1. sort.
+  assert (H2 : beval m b) by (destruct H0; now rewrite bexp_assrt_equiv in H2).
+  inverts H1. inverts H3. 2 : contradiction.
+  specializes H H0. 
+  assert (H3 : yields c'0 m'0 m') by (unfolds; exists~ n0).
+  specializes~ H H3.
+Qed.
+
+Lemma if_false_sound (b:bexp) c c' P Q :
+  |= c' : P /\ ~ b => Q ->
+  |= CIf b c c' : P /\ ~ b => Q.
+Proof.
+  unfolds valid_triple, triple, valid_assrt.
+  intros.
+  simpls.
+  unfolds in H1.
+  exists* H1. sort.
+  assert (H2 : ~ beval m b) by (destruct H0; now rewrite bexp_assrt_equiv in H2).
+  inverts H1. inverts H3. contradiction.
+  specializes H H0.
+  assert (H3 : yields c'0 m'0 m') by (unfolds; exists~ n0).
+  specializes~ H H3.
+Qed.
+
+Lemma yields_while_unroll b c m m' :
+  yields (CWhile b c) m m' ->
+  beval m b ->
+  yields (CSeq c (CWhile b c)) m m'.
+Proof.
+  intros. destruct H. inverts H.
+  inverts H1; [|contradiction].
+  exists~ n.
+Qed.
+
+Lemma while_true_sound (b:bexp) c P Q :
+  |= CSeq c (CWhile b c) : P /\ b => Q ->
+  |= CWhile b c : P /\ b => (Q /\ ~ b).
+Proof.
+  introv H1 H2 H3. simpls.
+  split.
+  - apply yields_while_unroll in H3.
+    applys H1 H2 H3. 
+    rewrite <- bexp_assrt_equiv. apply H2.
+  - rewrite bexp_assrt_equiv.
+    inverts H3.
+    now apply while_multistep_termination in H.
+Qed.
+
+Lemma while_false_sound (b:bexp) c P :
+  |= CWhile b c : P /\ ~ b => (P /\ ~ b).
+Proof.
+  introv H1 H2.
+  inverts H2.
+  inverts H.
+  inverts H0.
+  2 : { inverts~ H'. cstep_skip. }
+  apply sat_and in H1.
+  destruct H1.
+  simpls.
+  contradict H0.
+  apply bexp_assrt_equiv.
+  trivial.
+Qed.
+
+End Soundness.
