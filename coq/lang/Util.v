@@ -123,6 +123,9 @@ Tactic Notation "dup_hyp" hyp(H) :=
   pose proof H as H'.
 
 
+Axiom n_pos_inf : nat.
+Axiom n_inf_gt : forall n:nat, (n < n_pos_inf).
+Axiom n_inf_add : forall n:nat, (n_pos_inf + n = n_pos_inf).
 
 Axiom z_pos_inf : int.
 Axiom z_neg_inf : int.
