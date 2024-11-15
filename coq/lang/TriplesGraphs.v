@@ -86,7 +86,7 @@ Definition _graph : Type := NodeMap.t node.
 
 Definition node_closed (g : _graph) (node:node) :=
   forall nid,
-  LibList.mem nid node.(prems) ->
+  List.In nid node.(prems) ->
   In nid g.
 
 Definition Image node (g : _graph) :=
@@ -108,6 +108,53 @@ Coercion proj1_graph : graph >-> _graph.
 Definition node_of_graph g : Type := { nd : node | Image nd g }.
 
 
+Section MapMem.
+
+  Variable A B : Type.
+  Variable l : list A.
+  Variable f : forall (a:A), List.In a l -> B.
+
+  Definition sub l' :=
+    forall a, List.In a l' -> List.In a l.
+
+  Inductive _mapmem : list A -> list B -> Prop :=
+  | MapMemNil
+    : _mapmem nil nil
+  | MapMemCons a l' l'' (H: List.In a l) (R : _mapmem l' l'') 
+    : _mapmem (a::l') (f a H :: l'').
+
+  Lemma mapmem_ex : forall l',
+    sub l' ->
+    exists l'', unique (_mapmem l') l''.
+  Proof.
+    induction l'.
+    { intro. exists (@nil B). constructor~. constructor~.
+      intros. inverts~ H0. }
+    intros. specializes IHl'.
+    { introv ?. apply H. apply~ List.in_cons. }
+    exists* IHl'.
+    specializes H List.in_eq.
+    exists (f a H :: l'').
+    constructor~.
+    constructor~. unfolds in IHl'. easy.
+    intros. inverts H0. sort.
+    unfolds in IHl'. exists* IHl'.
+    f_equal. f_equal. apply proof_irrelevance.
+    apply~ IHl'0.
+  Qed.
+
+  Lemma sub_refl : sub l.
+  Proof. unfolds. auto. Qed.
+
+  Definition mapmem : list B :=
+    proj1_sig (constructive_definite_description _ (mapmem_ex sub_refl)).
+    
+End MapMem.
+
+
+Check mapmem.
+
+
 Lemma node_from_in (g:_graph) nid (H:In nid g) :
   exists nd, unique (fun nd => MapsTo nid nd g) nd.
 Proof.
@@ -121,53 +168,66 @@ Proof.
     apply~ H. auto.
 Qed.
 
-
-Definition l_in (nid:nodeID) (l:list nodeID) : LibList.mem nid l.
-Admitted.
-
-
 Definition helper g nid (x : {nd : node | MapsTo nid nd (proj1_sig g)}) 
 : node_of_graph g.
-destruct x. econstructor. unfolds.
-exists nid. apply m.
+  destruct x. econstructor. unfolds.
+  exists nid. apply m.
 Defined.
 
+Definition get_prems (g:graph) (nd:node_of_graph g)
+: list (node_of_graph g) :=
+  let nc := (proj2_sig g) (proj1_sig nd) (proj2_sig nd) in
+  mapmem (proj1_sig nd).(prems) (
+    fun nid nid_mem =>
+    let nid_in := nc nid nid_mem in
+    helper g (constructive_definite_description _ (@node_from_in g nid nid_in))
+  ).
 
-Section MapMem.
 
-  Variable A B : Type.
-  Variable l : list A.
-  Variable f : forall (a:A), List.In a l -> B.
-
-  Lemma mapmem_helper a' l' :
-    (forall a, List.In a (a'::l') -> List.In a l) ->
-    (forall a, List.In a l' -> List.In a l).
+(*  Lemma mapmem_helper a' l' l'' :
+    l' = a'::l'' ->
+    (forall a, List.In a l' -> List.In a l) ->
+    (forall a, List.In a l'' -> List.In a l).
   Proof.
-    intros.
-    apply H. apply~ List.in_cons.
+    intros. subst.
+    apply H0. apply~ List.in_cons.
   Qed.
+
+  Lemma mapmem_helper2 :
+    forall a, List.In a l -> List.In a l.
+  Proof. auto. Qed.
+
+  Lemma mapmem_helper3 l' a (l'' : list A) :
+    l' = a::l'' ->
+    List.In a l'.
+  Proof.
+    intro. subst. apply List.in_eq.
+  Qed.
+
+  Fixpoint _mapmem (l' : list A) (H : forall a, List.In a l' -> List.In a l)
+  : list B.
+    refine (
+    (match l' as l'0 return l' = l'0 -> list B with
+    | [] => fun _ => []
+    | a::l'' => 
+      fun Hyp =>
+      f a (H a (mapmem_helper3 Hyp)) :: _mapmem l'' (mapmem_helper Hyp H)
+    end)
+    (eq_refl l')).
 
   Fixpoint _mapmem (l' : list A) (H : forall a, List.In a l' -> List.In a l) 
   : list B :=
     match l' with
     | [] => []
-    | a::l'' => f (H a (List.in_eq a l')) :: _mapmem l f l'' (mapmem_helper )
+    | a::l'' => f (H a (List.in_eq a l'')) :: _mapmem l f l'' (mapmem_helper a l'')
     end.
+  
+  Definition mapmem :=
+    _mapmem l f l mapmem_helper2.
 
-Definition mapmem (l : list A) (f: forall (a:A), List.In a l -> B) :=
-  _mapmem l f l.
+End MapMem.*)
 
 
-
-Definition get_prems (g:graph) (nd:node_of_graph g)
-: list (node_of_graph g) :=
-  let nc := (proj2_sig g) (proj1_sig nd) (proj2_sig nd) in
-  List.map (
-    fun nid =>
-    let nid_mem := l_in nid (proj1_sig nd).(prems) in
-    let nid_in := nc nid nid_mem in
-    helper g (constructive_definite_description _ (@node_from_in g nid nid_in))
-  ) (proj1_sig nd).(prems).
 
 
 
