@@ -69,33 +69,131 @@ End NodeID.
 
 Notation nodeID := NodeID.t.
 
-Record node : Type := mkNode {
-  nid : nodeID;
-  conc : stmt;
-  rulename : rule;
-  prems : list nodeID
-}.
-
-
 From Coq Require FMapList FMapFacts.
 
 Module Import NodeMap := FMapList.Make(NodeID).
 Module NodeMapFacts := FMapFacts.Facts(NodeMap).
 
-Definition graph := NodeMap.t node.
+
+Inductive node : Type := mkNode {
+  nid : nodeID;
+  conc : stmt;
+  rulename : rule;
+  prems : list nodeID 
+}.
+
+Definition _graph : Type := NodeMap.t node.
+
+Definition node_closed (g : _graph) (node:node) :=
+  forall nid,
+  LibList.mem nid node.(prems) ->
+  In nid g.
+
+Definition Image node (g : _graph) :=
+  exists nid, MapsTo nid node g.
+
+Definition graph_closed g :=
+  forall node,
+  Image node g ->
+  node_closed g node.
+
+Definition graph :=
+  { g | graph_closed g }.
 
 Implicit Type g : graph.
 
-(*Definition node_dummy : node := mkNode O (|-true) HL_Skip [].
+Definition proj1_graph g := proj1_sig g.
+Coercion proj1_graph : graph >-> _graph.
 
-Global Instance Inhab_node : Inhab node.
-Proof using.
-  constructor. exists~ node_dummy.
+Definition node_of_graph g : Type := { nd : node | Image nd g }.
+
+
+Lemma node_from_in (g:_graph) nid (H:In nid g) :
+  exists nd, unique (fun nd => MapsTo nid nd g) nd.
+Proof.
+  apply NodeMapFacts.in_find_iff in H.
+  apply none_not_some in H. exists* H.
+  exists j. unfolds.
+  splits.
+  - apply~ NodeMapFacts.find_mapsto_iff.
+  - intros. applys NodeMapFacts.MapsTo_fun.
+    apply~ NodeMapFacts.find_mapsto_iff.
+    apply~ H. auto.
 Qed.
-*)
+
+
+Definition l_in (nid:nodeID) (l:list nodeID) : LibList.mem nid l.
+Admitted.
+
+
+Definition helper g nid (x : {nd : node | MapsTo nid nd (proj1_sig g)}) 
+: node_of_graph g.
+destruct x. econstructor. unfolds.
+exists nid. apply m.
+Defined.
+
+
+Section MapMem.
+
+  Variable A B : Type.
+  Variable l : list A.
+  Variable f : forall (a:A), List.In a l -> B.
+
+  Lemma mapmem_helper a' l' :
+    (forall a, List.In a (a'::l') -> List.In a l) ->
+    (forall a, List.In a l' -> List.In a l).
+  Proof.
+    intros.
+    apply H. apply~ List.in_cons.
+  Qed.
+
+  Fixpoint _mapmem (l' : list A) (H : forall a, List.In a l' -> List.In a l) 
+  : list B :=
+    match l' with
+    | [] => []
+    | a::l'' => f (H a (List.in_eq a l')) :: _mapmem l f l'' (mapmem_helper )
+    end.
+
+Definition mapmem (l : list A) (f: forall (a:A), List.In a l -> B) :=
+  _mapmem l f l.
+
+
+
+Definition get_prems (g:graph) (nd:node_of_graph g)
+: list (node_of_graph g) :=
+  let nc := (proj2_sig g) (proj1_sig nd) (proj2_sig nd) in
+  List.map (
+    fun nid =>
+    let nid_mem := l_in nid (proj1_sig nd).(prems) in
+    let nid_in := nc nid nid_mem in
+    helper g (constructive_definite_description _ (@node_from_in g nid nid_in))
+  ) (proj1_sig nd).(prems).
+
+
+
+Definition max_option (a b : nat?) : nat? :=
+  match a, b with
+  | Some n1, Some n2 => Some (Nat.max n1 n2)
+  | _, _ => None
+  end.
+
+Definition depth_fold (l : list nat?) : nat? :=
+  List.fold_left max_option l (Some O).
+
+Fixpoint depth (g:graph) (fuel:nat) (nd:node_of_graph g) : nat? :=
+  match fuel with 
+  | O => None
+  | S fuel =>
+    let depths := 
+      LibList.map (@depth g fuel)
+      (get_prems nd) in
+    option_map S (depth_fold depths)
+  end.
+
+
 
 Definition has_conc g nid s :=
-  match NodeMap.find nid g with
+  match find nid (proj1_sig g) with
   | None => False
   | Some node => node.(conc) = s
   end.
@@ -142,8 +240,6 @@ Inductive node_valid (g:graph) : node -> Prop :=
     : node_valid g (mkNode nid (|- P) HL_AssrtLift [])
 .
 
-Definition Image node g :=
-  exists nid, MapsTo nid node g.
 
 Definition graph_valid (g:graph) :=
   forall node,
@@ -155,7 +251,7 @@ Lemma graph_valid_node_in g (H : graph_valid g) :
   Image node g ->
   forall prem,
   LibList.mem prem node.(prems) ->
-  In prem g.
+  In prem (proj1_sig g).
 Proof.
   intros. specializes H H0.
   apply NodeMapFacts.in_find_iff. intro.
@@ -191,13 +287,14 @@ Definition path := list nodeID.
 
 Inductive is_path (g:graph) : path -> Prop :=
   | Path0 : is_path g []
-  | Path1 nid1 (H : In nid1 g) 
+  | Path1 nid1 (H : In nid1 (proj1_graph g)) 
     : is_path g [nid1]%list
-  | Path2 nid1 nid2 p node (H : MapsTo nid1 node g) 
+  | Path2 nid1 nid2 p node (H : MapsTo nid1 node (proj1_graph g)) 
     (HM : LibList.mem nid2 node.(prems))
     (HP : is_path g (nid2::p))
     : is_path g (nid1::nid2::p)
   .
+
 
 Definition graph_acyclic (g:graph) :=
   exists (n:nat),
