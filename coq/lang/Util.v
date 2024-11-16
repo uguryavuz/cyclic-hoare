@@ -1809,3 +1809,50 @@ Notation "m '[' a '=' b ']'" := (upd m a b)
   | [ |- context[(?m[?a=(?b)][][?a=(?b')])] ] =>
     rewrite upd_shadow1
   end.*)
+
+
+
+  
+
+Section MapMem.
+
+  Variable A B : Type.
+  Variable l : list A.
+  Variable f : forall (a:A), List.In a l -> B.
+
+  Local Definition sub l' :=
+    forall a, List.In a l' -> List.In a l.
+
+  Inductive mapmem_aux : list A -> list B -> Prop :=
+  | MapMemNil
+    : mapmem_aux nil nil
+  | MapMemCons a l' l'' (H: List.In a l) (R : mapmem_aux l' l'') 
+    : mapmem_aux (a::l') (f a H :: l'').
+
+  Lemma mapmem_ex : forall l',
+    sub l' ->
+    exists l'', unique (mapmem_aux l') l''.
+  Proof.
+    induction l'.
+    { intro. exists (@nil B). constructor~. constructor~.
+      intros. inverts~ H0. }
+    intros. specializes IHl'.
+    { introv ?. apply H. apply~ List.in_cons. }
+    exists* IHl'.
+    specializes H List.in_eq.
+    exists (f a H :: l'').
+    constructor~.
+    constructor~. unfolds in IHl'. easy.
+    intros. inverts H0. sort.
+    unfolds in IHl'. exists* IHl'.
+    f_equal. f_equal. apply proof_irrelevance.
+    apply~ IHl'0.
+  Qed.
+
+  Lemma sub_refl : sub l.
+  Proof. unfolds. auto. Qed.
+
+  Definition mapmem : list B :=
+    proj1_sig (constructive_definite_description _ (mapmem_ex sub_refl)).
+    
+End MapMem.

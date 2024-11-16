@@ -105,56 +105,8 @@ Implicit Type g : graph.
 Definition proj1_graph g := proj1_sig g.
 Coercion proj1_graph : graph >-> _graph.
 
-Definition node_of_graph g : Type := { nd : node | Image nd g }.
 
-
-Section MapMem.
-
-  Variable A B : Type.
-  Variable l : list A.
-  Variable f : forall (a:A), List.In a l -> B.
-
-  Definition sub l' :=
-    forall a, List.In a l' -> List.In a l.
-
-  Inductive _mapmem : list A -> list B -> Prop :=
-  | MapMemNil
-    : _mapmem nil nil
-  | MapMemCons a l' l'' (H: List.In a l) (R : _mapmem l' l'') 
-    : _mapmem (a::l') (f a H :: l'').
-
-  Lemma mapmem_ex : forall l',
-    sub l' ->
-    exists l'', unique (_mapmem l') l''.
-  Proof.
-    induction l'.
-    { intro. exists (@nil B). constructor~. constructor~.
-      intros. inverts~ H0. }
-    intros. specializes IHl'.
-    { introv ?. apply H. apply~ List.in_cons. }
-    exists* IHl'.
-    specializes H List.in_eq.
-    exists (f a H :: l'').
-    constructor~.
-    constructor~. unfolds in IHl'. easy.
-    intros. inverts H0. sort.
-    unfolds in IHl'. exists* IHl'.
-    f_equal. f_equal. apply proof_irrelevance.
-    apply~ IHl'0.
-  Qed.
-
-  Lemma sub_refl : sub l.
-  Proof. unfolds. auto. Qed.
-
-  Definition mapmem : list B :=
-    proj1_sig (constructive_definite_description _ (mapmem_ex sub_refl)).
-    
-End MapMem.
-
-
-Check mapmem.
-
-
+(* If nid is in g, then g maps nid to a unique node *)
 Lemma node_from_in (g:_graph) nid (H:In nid g) :
   exists nd, unique (fun nd => MapsTo nid nd g) nd.
 Proof.
@@ -168,68 +120,32 @@ Proof.
     apply~ H. auto.
 Qed.
 
-Definition helper g nid (x : {nd : node | MapsTo nid nd (proj1_sig g)}) 
-: node_of_graph g.
+
+Section Nodes.
+
+Variable g : graph.
+
+(* node of graph *)
+Definition nog : Type := { nd : node | Image nd g }.
+
+(* Convert nid and node to which it maps into nog *)
+Local Definition get_prems_aux nid (x : {nd : node | MapsTo nid nd (proj1_sig g)}) 
+: nog.
   destruct x. econstructor. unfolds.
   exists nid. apply m.
 Defined.
 
-Definition get_prems (g:graph) (nd:node_of_graph g)
-: list (node_of_graph g) :=
-  let nc := (proj2_sig g) (proj1_sig nd) (proj2_sig nd) in
+(* Get nodes that are premises of node *)
+Definition get_prems (nd:nog)
+: list nog :=
+  let graph_closed := proj2_sig g in
+  let node_closed := graph_closed (proj1_sig nd) (proj2_sig nd) in
   mapmem (proj1_sig nd).(prems) (
-    fun nid nid_mem =>
-    let nid_in := nc nid nid_mem in
-    helper g (constructive_definite_description _ (@node_from_in g nid nid_in))
+    fun nid nid_mem =>  (* Node ID, and witness that it is member of prems list *)
+    let nid_in := node_closed nid nid_mem in
+    let node := @node_from_in g nid nid_in in
+    get_prems_aux (constructive_definite_description _ node)
   ).
-
-
-(*  Lemma mapmem_helper a' l' l'' :
-    l' = a'::l'' ->
-    (forall a, List.In a l' -> List.In a l) ->
-    (forall a, List.In a l'' -> List.In a l).
-  Proof.
-    intros. subst.
-    apply H0. apply~ List.in_cons.
-  Qed.
-
-  Lemma mapmem_helper2 :
-    forall a, List.In a l -> List.In a l.
-  Proof. auto. Qed.
-
-  Lemma mapmem_helper3 l' a (l'' : list A) :
-    l' = a::l'' ->
-    List.In a l'.
-  Proof.
-    intro. subst. apply List.in_eq.
-  Qed.
-
-  Fixpoint _mapmem (l' : list A) (H : forall a, List.In a l' -> List.In a l)
-  : list B.
-    refine (
-    (match l' as l'0 return l' = l'0 -> list B with
-    | [] => fun _ => []
-    | a::l'' => 
-      fun Hyp =>
-      f a (H a (mapmem_helper3 Hyp)) :: _mapmem l'' (mapmem_helper Hyp H)
-    end)
-    (eq_refl l')).
-
-  Fixpoint _mapmem (l' : list A) (H : forall a, List.In a l' -> List.In a l) 
-  : list B :=
-    match l' with
-    | [] => []
-    | a::l'' => f (H a (List.in_eq a l'')) :: _mapmem l f l'' (mapmem_helper a l'')
-    end.
-  
-  Definition mapmem :=
-    _mapmem l f l mapmem_helper2.
-
-End MapMem.*)
-
-
-
-
 
 Definition max_option (a b : nat?) : nat? :=
   match a, b with
@@ -240,158 +156,114 @@ Definition max_option (a b : nat?) : nat? :=
 Definition depth_fold (l : list nat?) : nat? :=
   List.fold_left max_option l (Some O).
 
-Fixpoint depth (g:graph) (fuel:nat) (nd:node_of_graph g) : nat? :=
+Fixpoint depth_aux (fuel:nat) (nd:nog) : nat? :=
   match fuel with 
   | O => None
   | S fuel =>
     let depths := 
-      LibList.map (@depth g fuel)
+      LibList.map (@depth_aux fuel)
       (get_prems nd) in
     option_map S (depth_fold depths)
   end.
 
+Definition depth nd : nat? :=
+  @depth_aux (NodeMap.cardinal (proj1_sig g)) nd.
+
+(* No path longer than the number of nodes exists *)
+Definition graph_acyclic :=
+  forall (nd:nog),
+  depth nd <> None.
 
 
-Definition has_conc g nid s :=
+
+Definition path := list nodeID.
+
+Inductive is_path : path -> Prop :=
+  | Path0 : is_path nil
+  | Path1 nid1 (H : In nid1 (proj1_graph g)) 
+    : is_path (nid1::[])
+  | Path2 nid1 nid2 p node (H : MapsTo nid1 node (proj1_graph g)) 
+    (HM : LibList.mem nid2 node.(prems))
+    (HP : is_path (nid2::p))
+    : is_path (nid1::nid2::p)
+  .
+
+
+
+Definition has_conc nid s :=
   match find nid (proj1_sig g) with
   | None => False
   | Some node => node.(conc) = s
   end.
 
-Inductive node_valid (g:graph) : node -> Prop :=
+Inductive node_valid : node -> Prop :=
   | Rule_HL_CSQ nid id1 id2 id3 P P' Q Q' c
-    (H1 : has_conc g id1 (|- (P->P'))) 
-    (H2 : has_conc g id2 (|- c : P' => Q'))
-    (H3 : has_conc g id3 (|- (Q'->Q)))
-    : node_valid g (mkNode nid (|- c : P => Q) HL_CSQ [id1;id2;id3])
+    (H1 : has_conc id1 (|- (P->P'))) 
+    (H2 : has_conc id2 (|- c : P' => Q'))
+    (H3 : has_conc id3 (|- (Q'->Q)))
+    : node_valid (mkNode nid (|- c : P => Q) HL_CSQ [id1;id2;id3])
   | Rule_HL_Case nid id1 id2 P P' Q c
-    (H1 : has_conc g id1 (|- c : P /\ P' => Q))
-    (H2 : has_conc g id2 (|- c : P /\ ~ P' => Q))
-    : node_valid g (mkNode nid (|- c : P => Q) HL_Case [id1;id2])
+    (H1 : has_conc id1 (|- c : P /\ P' => Q))
+    (H2 : has_conc id2 (|- c : P /\ ~ P' => Q))
+    : node_valid (mkNode nid (|- c : P => Q) HL_Case [id1;id2])
 
   | Rule_HL_Skip nid P
-    : node_valid g (mkNode nid (|- CSkip : P => P) HL_Skip [])
+    : node_valid (mkNode nid (|- CSkip : P => P) HL_Skip [])
 
   | Rule_HL_Assn nid x a P
-    : node_valid g (mkNode nid (|- CAssn x a : P[a/x] => P) HL_Assn [])
+    : node_valid (mkNode nid (|- CAssn x a : P[a/x] => P) HL_Assn [])
 
   | Rule_HL_Seq nid id1 id2 P Q R c1 c2
-    (H1 : has_conc g id1 (|- c1 : P => Q))
-    (H2 : has_conc g id2 (|- c2 : Q => R))
-    : node_valid g (mkNode nid (|- CSeq c1 c2 : P => R) HL_Seq [id1;id2])
+    (H1 : has_conc id1 (|- c1 : P => Q))
+    (H2 : has_conc id2 (|- c2 : Q => R))
+    : node_valid (mkNode nid (|- CSeq c1 c2 : P => R) HL_Seq [id1;id2])
   
   | Rule_HL_IfTrue nid id1 P Q (b:bexp) c c'
-    (H1 : has_conc g id1 (|- c : P /\ b => Q))
-    : node_valid g (mkNode nid (|- CIf b c c' : P /\ b => Q) HL_IfTrue [id1]%list)
+    (H1 : has_conc id1 (|- c : P /\ b => Q))
+    : node_valid (mkNode nid (|- CIf b c c' : P /\ b => Q) HL_IfTrue [id1]%list)
 
   | Rule_HL_IfFalse nid id1 P Q (b:bexp) c c'
-    (H1 : has_conc g id1 (|- c' : P /\ ~b => Q))
-    : node_valid g (mkNode nid (|- CIf b c c' : P /\ ~b => Q) HL_IfFalse [id1]%list)
+    (H1 : has_conc id1 (|- c' : P /\ ~b => Q))
+    : node_valid (mkNode nid (|- CIf b c c' : P /\ ~b => Q) HL_IfFalse [id1]%list)
 
   | Rule_HL_WhileTrue nid id1 P Q (b:bexp) c
-    (H : has_conc g id1 (|- CSeq c (CWhile b c) : P /\ b => Q))
-    : node_valid g (mkNode nid (|- CWhile b c : P /\ b => (Q /\ ~b)) HL_WhileTrue [id1]%list)
+    (H : has_conc id1 (|- CSeq c (CWhile b c) : P /\ b => Q))
+    : node_valid (mkNode nid (|- CWhile b c : P /\ b => (Q /\ ~b)) HL_WhileTrue [id1]%list)
 
   | Rule_HL_WhileFalse nid P b c
-    : node_valid g (mkNode nid (|- CWhile b c : P /\ ~b => (P /\ ~b)) HL_WhileFalse [])
+    : node_valid (mkNode nid (|- CWhile b c : P /\ ~b => (P /\ ~b)) HL_WhileFalse [])
 
   | Rule_AssrtLift nid P
     (H : (|= P)%V)
-    : node_valid g (mkNode nid (|- P) HL_AssrtLift [])
+    : node_valid (mkNode nid (|- P) HL_AssrtLift [])
 .
 
 
-Definition graph_valid (g:graph) :=
-  forall node,
-  Image node g ->
-  node_valid g node.
+Definition graph_valid :=
+  forall (nd:nog),
+  node_valid (proj1_sig nd).
 
-Lemma graph_valid_node_in g (H : graph_valid g) :
-  forall node,
-  Image node g ->
-  forall prem,
-  LibList.mem prem node.(prems) ->
-  In prem (proj1_sig g).
-Proof.
-  intros. specializes H H0.
-  apply NodeMapFacts.in_find_iff. intro.
-  inverts~ H; simpls; unfolds has_conc.
-  all: try easy.
-  - inverts H1. now rewrite H2 in *.
-    inverts H6. now rewrite H2 in *.
-    inverts H1. now rewrite H2 in *.
-    inverts H6.
-  - inverts H1. now rewrite H2 in *.
-    inverts H5. now rewrite H2 in *.
-    easy.
-  - inverts H1. now rewrite H2 in *.
-    inverts H5. now rewrite H2 in *.
-    easy.
-  - inverts~ H1. now rewrite H2 in *.
-    easy.
-  - inverts~ H1. now rewrite H2 in *.
-    easy.
-  - inverts~ H1. now rewrite H2 in *.
-    easy.
-Qed.
+Definition derives (H:graph_valid) (s:stmt) :=
+  exists (nd:nog), (proj1_sig nd).(conc) = s.
 
+End Nodes.
 
-Definition derives (g:graph) (H:graph_valid g) (s:stmt) :=
-  exists node, Image node g /\ node.(conc) = s.
 
 Definition derivable (s:stmt) :=
   exists (g:graph) (H:graph_valid g),
   @derives g H s.
 
-Definition path := list nodeID.
-
-Inductive is_path (g:graph) : path -> Prop :=
-  | Path0 : is_path g []
-  | Path1 nid1 (H : In nid1 (proj1_graph g)) 
-    : is_path g [nid1]%list
-  | Path2 nid1 nid2 p node (H : MapsTo nid1 node (proj1_graph g)) 
-    (HM : LibList.mem nid2 node.(prems))
-    (HP : is_path g (nid2::p))
-    : is_path g (nid1::nid2::p)
-  .
 
 
-Definition graph_acyclic (g:graph) :=
-  exists (n:nat),
+
+Lemma acyclic_path_equiv g :
+  graph_acyclic g <->
+  exists n,
   forall p,
   is_path g p ->
-  LibList.length p <= n.
-
-
-(*Section Trees.
-
-Inductive tree : Type :=
-  Tree (conc:stmt) (rule:rule) (prems:list tree).
-
-
-Definition graph_to_tree g (H:graph_acyclic g) (nid:nodeID) : tree. Admitted.
-
-
-End Trees.
-*)
-
-(*Inductive _depth g nid p : nat -> Prop :=
-  | DepthC (HC : LibList.mem nid p) 
-    : _depth g nid p n_pos_inf
-  | Depth0 node (HN : MapsTo nid node g) 
-    (HF : ~ LibList.mem nid p)
-    (H : node.(prems) = []) : _depth g nid p O
-  | DepthN node l (m:nat) (HN : MapsTo nid node g)
-    (HF : ~ LibList.mem nid p)
-    (H : node.(prems) = l) 
-    (HM : exists nid', LibList.mem nid' l /\ _depth g nid' (nid::p) m)
-    (HL : forall nid' (m':nat), LibList.mem nid' l -> 
-          _depth g nid' (nid::p) m' -> m' <= m)
-    : _depth g nid p (S m)
-.
-    
-Definition depth g nid n :=
-*)
+  List.length p < n.
+Proof.
+Abort.
 
 Section Soundness.
 
@@ -399,42 +271,63 @@ Open Scope valid_scope.
 
 Lemma soundness0 g c P Q nid rule :
   graph_valid g ->
-  MapsTo nid (mkNode nid (|-c:P=>Q) rule []) g ->
+  MapsTo nid (mkNode nid (|-c:P=>Q) rule []) (proj1_sig g) ->
   |=c:P=>Q.
 Proof.
-  intros. specializes H.
-  exists nid. apply H0.
-  inverts H.
+  unfolds graph_valid.
+  intros.
+  simpls. remember (mkNode _ _ _ _) as nd.
+  assert (Image nd g). { destruct g. simpls. exists~ nid. }
+  remember (exist _ nd H1 : nog g) as N'.
+  specializes H N'. subst. clear H0.
+  simpls.
+  inverts~ H; subst.
   apply skip_sound.
   apply assn_sound.
   apply while_false_sound.
 Qed.
 
 
-(*Inductive depth g (Cyc : graph_acyclic g) nid (I : In nid g) : nat -> Prop :=
-  | Depth0 node (HN : MapsTo nid node g) (H : node.(prems) = []) : depth Cyc I O
-  | DepthN n (H : (read g nid).(prems) = l)
-    (R : exists prem, LibList.mem prem l /\ depth Cyc 
-    forall prem (I':indom g prem), 
-         LibList.mem prem l -> depth Cyc I' n ->
-          
-      )
 
-
-Definition depth g (H : graph_acyclic g) :=
-  let max := indefinite_description H in
-  fix rec d nid :=
-    match d with
-    | O => O
-  .
+(*Definition oget {A:Type} (X : option A) (H : X <> None) : A :=
+  indefinite_description _ (none_not_some H).
 *)
 
+Lemma local_soundness g (AC : graph_acyclic g) (nd:nog g) :
+  forall c P Q,
+  (proj1_sig nd).(conc) = |- c : P => Q ->
+  |= c : P => Q.
+Proof.
+  unfolds in AC.
+  induction (depth nd) using (well_founded_induction lt_wf).
 
-Lemma soundness c P Q g (H : graph_valid g) :
+
+
+
+Lemma soundness_acyclic g :
   graph_acyclic g ->
+  forall (H : graph_valid g),
+  forall c P Q,
   derives H (|- c : P => Q) ->
   |= c : P => Q.
 Proof.
+  induction (cardinal (proj1_sig g)) eqn:C.
+  
+  (* Base: empty graph *)
+  { destruct g. simpls. unfolds cardinal.
+    destruct x. simpls. destruct this0.
+    2: { simpls. discriminate. }
+    simpls. intros.
+    unfolds in H1. exists* H1.
+    destruct nd. simpls. unfolds in i.
+    exists* i. unfolds in i.
+    unfolds in i. simpls. inverts i. }
+
+  
+
+  
+  
+   (* using (well_founded_induction lt_wf).*)
   (*
   intros (max&Cyc).
   unfolds in H1. exists* H1.
