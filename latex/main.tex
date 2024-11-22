@@ -178,8 +178,11 @@ $\Cfg(c,m) \sstepstotrans \Cfg(c',m')$ iff
 $\exists n.\ \Cfg(c,m) \sstepston n \Cfg(c',m')$.
 
 \begin{definition}
+    $c$ \emph{yields} $m'$ from $m$,
+    denoted $\Yields(c,m,m')$,
+    if $\Cfg(c,m) \sstepstotrans \Cfg(\Skip,m')$.
     $c$ \emph{terminates} on $m$, denoted $\Terminate(c,m)$,
-    iff $\exists m'. \Cfg(c,m) \sstepstotrans \Cfg(\Skip,m')$.
+    iff $\exists m'. \Yields(c,m,m')$.
     $c$ \emph{diverges} on $m$, denoted $\Diverge(c,m)$,
     iff $\neg \Terminate(c,m)$.
 \end{definition}
@@ -396,7 +399,7 @@ w.r.t.\ this translation.
 We prove various properties of assertions and expressions.
 Note that when we discuss substitution into boolean expressions,
 substitutions only affect free variables ---
-they are overriden by quantified variables.
+they are overridden by quantified variables.
 
 \begin{lemma}
 For $b \in \DomBexp$,
@@ -489,6 +492,169 @@ Properties include:
 \fi
 
 
+
+\section{Rule graphs}
+
+\newcommand*{\DomLiftable}{\mathit{Lift}}
+\newcommand*{\DomStmt}{\mathit{Stmt}}
+\newcommand*{\DomRule}{\mathit{Rule}}
+\newcommand*{\LIFT}{\textsc{Lift}}
+
+Suppose we have a family of statements $\DomStmt$,
+where for each statement $S \in \DomStmt$
+we have a defined notion of validity,
+denoted $\VAL S$.
+%
+We also have a subset of \emph{liftable} statements
+$\DomLiftable \subseteq \DomStmt$;
+these are statements for which
+we are ``comfortable'' lifting a proof of their derivability
+to a metalogical proof of their validity.
+%
+We also have a family of rules $\DomRule$ of the form
+\[
+    \inferrule*[right=Rule-Name]{
+        \DER S_1 \\ \cdots \\ \DER S_n
+    }{
+        \DER C
+    }
+\]
+%
+\begin{definition}
+    A rule with premises $S_1,\dots,S_n$ and conclusion $C$ is \emph{locally sound} if
+    \[\VAL S_1 \wedge \cdots \wedge \VAL S_n \implies \VAL C.\]
+\end{definition}
+%
+
+\newcommand*{\DomNode}{\mathit{Nodes}}
+\newcommand*{\node}{\mathit{node}}
+\newcommand*{\MapConc}{\mathit{conc}}
+\newcommand*{\MapRule}{\mathit{rule}}
+\newcommand*{\MapPrems}{\mathit{prems}}
+
+\begin{definition}
+A \emph{rule graph} is a tuple $G=(\DomNode,\MapConc,\MapRule,\MapPrems)$ for a
+finite set of node names $\DomNode$,
+and mappings %from node names to statements 
+    $\MapConc : \DomNode \ra \DomStmt$,
+%a mapping from node names to rule names 
+    $\MapRule : \DomNode \ra \DomRule$,
+%and a mapping from node names to premises 
+ and   $\MapPrems : \DomNode \ra \DomNode^* + \LIFT$,
+such that for every $\node \in \DomNode$:
+\begin{itemize}
+\item If $\MapPrems(\node) = p \in \DomNode^*$
+    where $\abs{p} = n$, then
+    \[
+        \inferrule{
+            \DER \MapConc(\MapPrems_1(\node))
+            \\ \cdots \\
+            \DER \MapConc(\MapPrems_n(\node))
+        }{ \DER \MapConc(\node) }
+    \]
+    is a syntactically valid instance of
+    the rule $\MapRule(\node)$,\\
+    where $\pi_i(\MapPrems(\node))$
+    denotes $\MapPrems_i(\node)$.
+\item Otherwise, if $\MapPrems(\node) = \LIFT$,
+    then $\MapConc(\node) \in \DomLiftable$.
+\end{itemize}
+\end{definition}
+
+\begin{definition}
+    A \emph{path} in a rule graph $(\DomNode,\MapConc,\MapRule,\MapPrems)$
+    is a possibly infinite sequence of nodes
+    $\node_1,\node_2,\dots$
+    all in $\DomNode$
+    such that
+    $\forall i > 0.\
+    \node_{i+1} \in \MapPrems(\node_i).
+    $
+\end{definition}
+
+\newcommand*{\reaches}[3]{%
+    \ensuremath{#1 \leadsto_{#3} #2}%
+}
+For a rule graph $G$ with a node set $\DomNode$,
+and a pair of nodes $\node, \node' \in \DomNode$,
+we will let \reaches{\node}{\node'}{G} denote
+the existence of a path in $G$
+that begins with $\node$ and ends with $\node'$.
+Note how a path containing a liftable node 
+which points to \LIFT\ must end at that node.
+
+\begin{definition}
+    A \emph{cycle} is a finite path $\node_1,\dots,\node_n$
+    for $n>1$,
+    where $\node_1 = \node_n$ and all other nodes are distinct.
+    \\
+    A rule graph is \emph{cyclic}
+    iff it contains a path which is a cycle.
+\end{definition}
+
+
+\begin{lemma}
+    A rule graph is cyclic iff
+    it does not have a longest path.
+\end{lemma}
+\begin{proof}
+By authority. (Depends on finitude of $\DomNode$)
+\end{proof}
+
+\newcommand{\restrict}[2]{%
+    #1 {\mid_{#2}} %
+}
+
+\begin{definition}
+    The \emph{subgraph} of a graph $G=(\DomNode,\MapConc,\MapRule,\MapPrems)$ w.r.t.\ $\node \in \DomNode$
+    is 
+    \\
+    $G'=(
+        \DomNode',\
+        \restrict\MapConc{\DomNode'},\
+        \restrict\MapRule{\DomNode'},\
+        \restrict\MapPrems{\DomNode'}
+    )$,
+    where $\DomNode' = 
+        \SetBuild(\node' \in \DomNode | \reaches{\node}{\node'}{G})$.
+\end{definition}
+
+
+\subsection{Soundness of acyclic graphs}
+
+\begin{definition}
+$(\DomNode,\MapConc,\_,\MapPrems)$ is \emph{valid}
+if
+\(
+    \forall \node \in \DomNode.\ \MapPrems(\node) = \LIFT \implies
+    \VAL \MapConc(\node).
+\)
+\end{definition}
+
+\begin{lemma}
+    Consider a graph $G=(\DomNode,\MapConc,\MapRule,\MapPrems)$,
+    a node $\node \in \DomNode$.
+    If the subgraph of $G$ w.r.t.\ $\node$ is acyclic and valid,
+    and all rules in the image of $\MapRule$ are locally sound,
+    then $\VAL \MapConc(\node)$.
+\end{lemma}
+
+\begin{definition}
+    $S$ is derivable, denoted $\DER S$,
+    if a valid graph $G$ contains $\node$
+    where $\MapConc(\node) = S$.
+\end{definition}
+
+\begin{theorem}
+    Suppose all rules are locally sound.
+    For a statement $S$,
+    if $\DER S$ via an acyclic graph,
+    then $\VAL S$.
+\end{theorem}
+
+
+
+
 \section{Proof system for unary Hoare logic}
 
 \paragraph{Hoare judgements}
@@ -499,7 +665,8 @@ We define partial Hoare triples:
     denoted $\AVALmi \Triple c : P => Q$,
     iff    
     $$\AVALmi P \implies \forall m'.\
-    \Cfg(c,m) \sstepstotrans \Cfg(\Skip,m') \implies
+    \Yields(c,m,m') \implies
+    %\Cfg(c,m) \sstepstotrans \Cfg(\Skip,m') \implies
     \AVAL m'|I|-Q.$$
 %
 $\AVALU \Triple c : P => Q$ denotes
@@ -536,8 +703,8 @@ the triple is \emph{derivable} in Hoare logic.
     % Case
     \and 
     \inferrule*[right=HL-Case]
-    { \VAL P \Longrightarrow P' \vee \neg P' \\
-        \DER \Triple c : P \wedge P' => Q \\ 
+    { % \VAL P \Longrightarrow P' \vee \neg P' \\
+      \DER \Triple c : P \wedge P' => Q \\ 
       \DER \Triple c : P \wedge \neg P' => Q }
     { \DER \Triple c : P => Q }
     \and
@@ -591,7 +758,13 @@ These rules are enough to recover a branching \emph{if} rule (using \emph{case})
 
 
 
-\subsection*{Local Soundness}
+\subsection*{Local soundness}
+In the case of unary HL,
+statements are triples of the form
+$\Triple c : P => Q$, and
+assertions $P$,
+where the latter comprise the liftable statements;
+and the rules consist of the structural and symbolic execution rules defined above.
 
 
 \begin{lemma}
@@ -730,14 +903,16 @@ We derive this result from local soundness.
     \forall (m_1,m_2) \in P.\
     \wedge
     \begin{cases}
-        (\exists m'_1.\ \Cfg(c_1,m_1) \sstepstotrans \Cfg(\Skip,m'_1))
+        \Terminate(c_1,m_1)
         \iff
-        (\exists m'_2.\ \Cfg(c_2,m_2) \sstepstotrans \Cfg(\Skip,m'_2))
+        \Terminate(c_2,m_2)
         \\
         \forall m'_1, m'_2.\
-        \Cfg(c_1,m_1) \sstepstotrans \Cfg(\Skip,m'_1) \wedge
-        \Cfg(c_2,m_2) \sstepstotrans \Cfg(\Skip,m'_2) \\
-        \hspace{0.5in} \implies
+        \Yields(c_1,m_1,m'_1) \wedge
+        \Yields(c_2,m_2,m'_2) \implies
+        %\Cfg(c_1,m_1) \sstepstotrans \Cfg(\Skip,m'_1) \wedge
+        %\Cfg(c_2,m_2) \sstepstotrans \Cfg(\Skip,m'_2) \\
+        %\hspace{0.5in} \implies
         (m'_1,m'_2) \in Q
     \end{cases}
 \end{array}

@@ -49,6 +49,11 @@
     {\Downarrow}%
 }
 
+\def\Yields(#1,#2,#3){%
+    \mathopen{}\left\langle #1, #2 \right\rangle\mathclose{}%
+    {\Downarrow} #3%
+}
+
 \newcommand{\Interp}[1]{%
     \left\llbracket #1 \right\rrbracket%
 }
@@ -100,3 +105,11 @@
 	}%
 }
 \newcommand{\BIIMP}{\mprset{myfraction=\biimp}}
+
+
+
+\newcommand{\ra}{\rightarrow}
+
+\newcommand{\abs}[1]{
+    \left|#1\right|
+}
