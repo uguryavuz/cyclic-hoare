@@ -159,7 +159,6 @@ Module ListFacts.
     eexists*. auto.
   Qed.
 
-
   Ltac list_from_length H :=
     match type of H with
     | length ?l = 0%nat =>
@@ -172,6 +171,64 @@ Module ListFacts.
       list_from_length H
     end.
 
+  Section FirstLast.
+
+  Variable A : Type.
+
+  Definition first (l : list A) : option A :=
+    match l with
+    | [] => None
+    | a :: _ => Some a
+    end.
+
+  Fixpoint last (l : list A) : option A :=
+    match l with
+    | [] => None
+    | a :: [] => Some a
+    | _ :: l => last l
+    end.
+
+  Lemma nonempty_first (l : list A) (H : l <> []) : 
+    exists (a : A), 
+      unique (fun a => first l = Some a) a.
+  Proof.
+    destruct l.
+    contradiction.
+    exists~ a.
+    unfolds.
+    split.
+    auto.
+    intros.
+    simpls.
+    injects~ H0.
+  Qed.
+
+  Lemma nonempty_last (l : list A) (H : l <> []) : 
+    exists (a : A),
+      unique (fun a => last l = Some a) a.
+  Proof.
+    generalize dependent H.
+    induction l.
+    contradiction.
+    intros.
+    simpl.
+    destruct l.
+    + exists a.
+      unfolds.
+      splits~.
+      intros.
+      injects~ H0.
+    + apply IHl.
+      discriminate.
+  Qed.
+
+  Definition get_nonempty_first (l : list A) (H : l <> []) : A :=
+    proj1_sig (constructive_definite_description _ (nonempty_first H)).
+
+  Definition get_nonempty_last (l : list A) (H : l <> []) : A :=
+    proj1_sig (constructive_definite_description _ (nonempty_last H)).
+
+  End FirstLast.
 End ListFacts.
 Export ListFacts.
 
