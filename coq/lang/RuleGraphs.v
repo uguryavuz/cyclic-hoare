@@ -99,4 +99,19 @@ Lemma reaches_refl nd : reaches nd nd.
     discriminate.
 Qed.
 
+Definition reaches_alt (nd1 nd2 : rg_node) : Prop :=
+  exists (p : path),
+    let node_list := proj1_sig p in
+      ListFacts.first node_list = Some nd1 /\
+      ListFacts.last node_list = Some nd2.
+
+Lemma reaches_alt_refl : forall nd, reaches_alt nd nd.
+  intros.
+  unfold reaches_alt.
+  assert (H : is_path ([nd]%list)) by (now unfold is_path).
+  exists (exist _ _ H).
+  assert (H_NE : [nd]%list <> []) by discriminate.
+  split; auto.
+Qed.
+
 End RuleGraph.
