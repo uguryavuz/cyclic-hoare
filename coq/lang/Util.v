@@ -188,6 +188,28 @@ Module ListFacts.
     | _ :: l => last l
     end.
 
+  Lemma last_append : forall (l1 l2 : list A), 
+    l2 <> [] -> last (l1 ++ l2) = last l2.
+  Proof.
+    intros.
+    induction l1; auto. 
+    assert (H1 : ((a :: l1) ++ l2 = a :: (l1 ++ l2))%list) by auto.
+    rewrite H1.
+    assert (H2 : (l1 ++ l2 <> [])%list) by (destruct l1; auto; discriminate).
+    destruct (l1 ++ l2)%list eqn:H3.
+    now contradict H2.
+    auto.
+  Qed.
+
+  Lemma last_repeat : forall (l : list A),
+    last (l ++ l) = last l.
+  Proof.
+    intros.
+    destruct l as [| hd tl] eqn:H; auto.
+    apply last_append.
+    discriminate.
+  Qed.
+
   Lemma nonempty_first (l : list A) (H : l <> []) : 
     exists (a : A), 
       unique (fun a => first l = Some a) a.

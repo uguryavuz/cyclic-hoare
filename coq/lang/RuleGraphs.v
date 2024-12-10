@@ -167,9 +167,14 @@ Proof.
   - apply is_path_implies_prems_relation.
 Qed.
 
-Theorem path_appending : forall (p p' : path) (nd : rg_node),
-  ListFacts.last (proj1_sig p) = Some nd ->
-  ListFacts.first (proj1_sig p') = Some nd ->
+Lemma empty_path_is_path : is_path ([])%list.
+Proof.
+  simpl.
+  auto.
+Qed.
+
+Theorem path_appending : forall (p p' : path),
+  ListFacts.last (proj1_sig p) = ListFacts.first (proj1_sig p') ->
   is_path ((proj1_sig p) ++ List.tl (proj1_sig p')).
 Proof.
   intros.
@@ -177,7 +182,7 @@ Proof.
   destruct p' as [p' Hp'].
   simpl in *.
   induction p.
-  - contradict H; discriminate.
+  - simpl in H. destruct p'. auto. discriminate.
   - destruct p.
     + simpl in IHp.
       assert (H1 : ([a] ++ List.tl p')%list = p'). {
@@ -185,19 +190,22 @@ Proof.
         discriminate.
         simpl in *.
         injects H.
-        injects H0.
         auto.
       }
       rewrite H1.
       auto.
     + destruct Hp.
-      assert (H3 : last (r :: p) = Some nd) by auto.
+      assert (H3 : last (r :: p) = first p') by auto.
       assert (H4 : is_path ((r :: p) ++ List.tl p')) by auto.
       assert (H5 : ((a :: r :: p) ++ List.tl p' = a :: r :: p ++ List.tl p')%list) by auto.
       rewrite H5.
       simpl in *.
       auto.
 Qed.
+
+Definition path_append (p p' : path) 
+    (H : ListFacts.last (proj1_sig p) = ListFacts.first (proj1_sig p')) : path :=
+  exist _ ((proj1_sig p) ++ List.tl (proj1_sig p'))%list (path_appending p p' H).
 
 Definition reaches (nd1 nd2 : rg_node) : Prop :=
   exists (p : path),
@@ -216,11 +224,9 @@ Qed.
 
 Definition is_cyclic_path (p : path) : Prop :=
   let node_list := proj1_sig p in
-    exists (nd : rg_node),
-      ListFacts.first node_list = Some nd /\
-      ListFacts.last node_list = Some nd /\
-      (List.length node_list > 1)%nat /\
-      List.NoDup (List.tail node_list).
+    ListFacts.last node_list = ListFacts.first node_list /\
+    List.NoDup (List.tl node_list) /\
+    (List.length node_list > 1)%nat.
 
 Definition is_cyclic_rule_graph : Prop :=
   exists (p : path), is_cyclic_path p.
@@ -242,35 +248,35 @@ Lemma longer_path_exists_implies_cyclic_graph :
   is_cyclic_rule_graph.
 Admitted.
 
-(* Definition reaches (nd1 nd2 : rg_node) : Prop :=
-  exists (p : path),
-    match classicT (proj1_sig p <> []) with
-    | left H => ListFacts.get_nonempty_first H = nd1 /\ ListFacts.get_nonempty_last H = nd2
-    | _ => False
-    end.
+(* Holding area *)
 
-Lemma reaches_refl nd : reaches nd nd.
-  unfolds.
-  assert (is_path (nd :: nil)) by (now unfold is_path). 
-  exists (exist _ _ H).
-  destruct (classicT (proj1_sig (exist is_path [nd]%list H) <> [])).
-  simpls.
-  + split.
-    - unfold get_nonempty_first.
-      destruct (constructive_definite_description _ _).
-      simpl.
-      unfold first in e.
-      injects e.
-      reflexivity.
-    - unfold get_nonempty_last.
-      destruct (constructive_definite_description _ _).
-      simpl.
-      unfold last in e.
-      injects e.
-      reflexivity.
-  + simpls. 
-    contradict n.
-    discriminate.
-Qed. *)
+Lemma appending_cycle_preserves_endpoints : 
+  forall (p : path) 
+      (H : ListFacts.last (proj1_sig p) = ListFacts.first (proj1_sig p)),
+    let appended_path := path_append p p H in
+      ListFacts.last (proj1_sig appended_path) = ListFacts.first (proj1_sig appended_path).
+Proof.
+  intros.
+  destruct p as [p Hp].
+  simpl in *.
+  destruct p; auto.
+  simpl.
+  assert (H0 : ((r :: p) ++ p = r :: (p ++ p))%list) by auto.
+  rewrite H0.
+  pose proof (ListFacts.last_repeat p).
+  simpl.
+  destruct (p ++ p)%list eqn:Hp'; auto.
+  rewrite H1.
+  simpl in H.
+  destruct p; auto.
+  discriminate.
+Qed.
+
+Fixpoint iterated_cycle (p : path) (H : is_cyclic_path p) (n : nat) : path :=
+  match n with
+  | O     => exist _ ([])%list empty_path_is_path
+  | 1%nat => p
+  | S n'  => path_append (@iterated_cycle p H n') p (appending_cycle_preserves_endpoints p (proj1 H))
+  end.
 
 End RuleGraph.
