@@ -188,6 +188,16 @@ Module ListFacts.
     | _ :: l => last l
     end.
 
+  Lemma first_append : forall (l1 l2 : list A),
+    l1 <> [] -> first (l1 ++ l2) = first l1.
+  Proof.
+    intros.
+    destruct l1. contradiction.
+    assert (H1 : ((a :: l1) ++ l2 = a :: (l1 ++ l2))%list) by auto.
+    rewrite H1. 
+    auto.
+  Qed.
+
   Lemma last_append : forall (l1 l2 : list A), 
     l2 <> [] -> last (l1 ++ l2) = last l2.
   Proof.
@@ -199,6 +209,13 @@ Module ListFacts.
     destruct (l1 ++ l2)%list eqn:H3.
     now contradict H2.
     auto.
+  Qed.
+
+  Lemma append_equals : forall (l1 l2 l' : list A),
+    l1 = l2 ->
+    l1 ++ l' = l2 ++ l'.
+  Proof.
+    intros. subst. auto.
   Qed.
 
   Lemma last_repeat : forall (l : list A),

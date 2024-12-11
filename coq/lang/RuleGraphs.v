@@ -68,110 +68,7 @@ Fixpoint is_path (p : list rg_node) : Prop :=
 Definition path : Type := 
   {p : list rg_node | is_path p}.
 
-Theorem is_path_implies_prems_relation:
-  forall (p : list rg_node),
-    is_path p ->
-    forall (i : nat),
-      (i < length p - 1)%nat ->
-      match List.nth_error p i, List.nth_error p (S i) with
-      | Some n1, Some n2 => List.In n2 (rg_prems n1)
-      | _, _ => True
-      end.
-Proof.
-  intros p H.
-  induction p.
-  - intros.
-    assert (@length rg_node ([])%list = 0%nat) by auto.
-    rewrite H1 in H0.
-    simpl in H0.
-    math.
-  - destruct i.
-    + intros.
-      simpl in H0.
-      simpl.
-      destruct p.
-      * simpl in H.
-        destruct H.
-        auto.
-      * simpl in H.
-        destruct H.
-        auto.
-    + intros.
-      simpl in H0.
-      simpl.
-      destruct p.
-      * simpl in H.
-        destruct H.
-        assert (H1 : (length ([a])%list = 1)%nat) by auto.
-        rewrite H1 in H0.
-        math.
-      * simpl in H.
-        destruct H.
-        apply IHp; auto.
-        assert (H2 : (length (a :: r :: p)%list = S (S (length p)))%nat) by auto.
-        rewrite H2 in H0.
-        assert (H3 : (length (r :: p)%list = S (length p))%nat) by auto.
-        math.
-Qed.
-
-Lemma prems_relation_implies_is_path:
-  forall (p : list rg_node),
-    (forall (i : nat),
-      (i < length p - 1)%nat ->
-      match List.nth_error p i, List.nth_error p (S i) with
-      | Some n1, Some n2 => List.In n2 (rg_prems n1)
-      | _, _ => True
-      end) ->
-    is_path p.
-Proof.
-  intros p H.
-  induction p; simpl; auto.
-  simpl.
-  destruct p; auto.
-  split.
-  - assert (H1 : (0 < length (a :: r :: p)%list - 1)%nat).
-    { simpl.
-      assert (H2 : (length (a :: r :: p)%list = S (S (length p)))%nat) by auto.
-      rewrite H2.
-      math. }
-    apply H in H1.
-    simpl in H1.
-    auto.
-  - apply IHp.
-    intros.
-    assert (H1 : (S i < length (a :: r :: p)%list - 1)%nat).
-    { simpl.
-      assert (H2 : (length (a :: r :: p)%list = S (S (length p)))%nat) by auto.
-      rewrite H2.
-      assert (H3 : (S (length p) = length (r :: p)%list)%nat) by auto.
-      rewrite H3.
-      math. }
-    apply H in H1.
-    simpl in H1.
-    auto.
-Qed.
-
-Theorem prems_relation_iff_is_path:
-  forall (p : list rg_node),
-    (forall (i : nat),
-      (i < length p - 1)%nat ->
-      match List.nth_error p i, List.nth_error p (S i) with
-      | Some n1, Some n2 => List.In n2 (rg_prems n1)
-      | _, _ => True
-      end) <->
-    is_path p.
-Proof.
-  intros.
-  split.
-  - apply prems_relation_implies_is_path.
-  - apply is_path_implies_prems_relation.
-Qed.
-
-Lemma empty_path_is_path : is_path ([])%list.
-Proof.
-  simpl.
-  auto.
-Qed.
+Section PathAppending.
 
 Theorem path_appending : forall (p p' : path),
   ListFacts.last (proj1_sig p) = ListFacts.first (proj1_sig p') ->
@@ -207,11 +104,15 @@ Definition path_append (p p' : path)
     (H : ListFacts.last (proj1_sig p) = ListFacts.first (proj1_sig p')) : path :=
   exist _ ((proj1_sig p) ++ List.tl (proj1_sig p'))%list (path_appending p p' H).
 
+End PathAppending.
+
+Section Reaches.
+
 Definition reaches (nd1 nd2 : rg_node) : Prop :=
   exists (p : path),
-    let node_list := proj1_sig p in
-      ListFacts.first node_list = Some nd1 /\
-      ListFacts.last node_list = Some nd2.
+    let nodelist := proj1_sig p in
+      ListFacts.first nodelist = Some nd1 /\
+      ListFacts.last nodelist = Some nd2.
 
 Lemma reaches_refl : forall nd, reaches nd nd.
   intros.
@@ -222,11 +123,188 @@ Lemma reaches_refl : forall nd, reaches nd nd.
   split; auto.
 Qed.
 
+End Reaches.
+
+Section LoopingNodelists.
+
+Definition looping_nodelist (p : list rg_node) : Prop :=
+  ListFacts.last p = ListFacts.first p.
+
+Fixpoint iterated_looping_nodelist (p : list rg_node) (H : looping_nodelist p) (n : nat) : list rg_node :=
+  match n with
+  | O     => p
+  | S n'  => (@iterated_looping_nodelist p H n') ++ List.tl p
+  end.
+
+Lemma iterated_looping_nodelist_loops : 
+  forall (p : list rg_node) (H : looping_nodelist p) (n : nat),
+    looping_nodelist (iterated_looping_nodelist H n).
+Proof.
+  intros.
+  destruct n as [| n']. 
+  simpl; now unfold looping_nodelist.
+  simpl.
+  induction n'; simpl.
+  - unfold looping_nodelist in *.
+    destruct p as [| hd tl] eqn:Hp; auto.
+    assert (H1 : p <> []) by (now rewrite Hp).
+    rewrite <- Hp in *.
+    rewrite first_append; auto.
+    destruct tl as [| hd' tl'] eqn:Htl.
+    rewrite Hp; simpl; now rewrite LibList.app_nil_r.
+    rewrite <- Htl in *.
+    assert (H2 : tl <> []) by (now rewrite Htl).
+    assert (H3 : List.tl p = tl). {
+      unfold List.tl.
+      destruct p.
+      contradiction.
+      now inversion Hp.
+    }
+    rewrite H3.
+    clear H3.
+    clear Htl.
+    rewrite last_append; auto.
+    assert (H4 : last p = last tl). {
+      unfold last at 1.
+      destruct p. contradiction. inverts Hp.
+      simpl in *.
+      destruct tl. contradiction.
+      auto.
+    }
+    rewrite <- H4.
+    auto.
+  - unfold looping_nodelist in *.
+    destruct p as [| hd tl].
+    + rewrite LibList.app_nil_r.
+      rewrite LibList.app_nil_r in *.
+      auto.
+    + unfold List.tl in *.
+      destruct tl as [| hd' tl']; 
+        [rewrite LibList.app_nil_r; now rewrite LibList.app_nil_r in * |].
+      remember (hd' :: tl') as tl.
+      assert (H1 : tl <> []) by (now rewrite Heqtl).
+      rewrite last_append in *; try auto.
+      remember (iterated_looping_nodelist H n') as l.
+      clear Heql.
+      destruct l. 
+      rewrite LibList.app_nil_l in *.
+      rewrite first_append; auto.
+      remember ((r :: l) ++ tl)%list as l'.
+      rewrite first_append in *; try auto.
+      now rewrite Heql'.
+Qed.
+
+Lemma iterated_looping_nodelist_share_endpoints : 
+  forall (p : list rg_node) (H : looping_nodelist p) (n : nat),
+    ListFacts.first p = ListFacts.first (iterated_looping_nodelist H n) /\
+    ListFacts.last p = ListFacts.last (iterated_looping_nodelist H n).
+Proof.
+  intros.
+  destruct p as [| hd tl] eqn:Hp.
+  - induction n as [| n']; auto.
+    destruct IHn' as [H1 H2].
+    simpl in *.
+    rewrite LibList.app_nil_r in *.
+    split; auto.
+  - induction n as [| n']; [auto|].
+    destruct IHn' as [H1 H2].
+    split.
+    + simpl.
+      rewrite first_append; auto.
+      destruct n'; [simpl; discriminate|].
+      simpl.
+      destruct tl as [| hd' tl'] eqn:Htl.
+      * simpl in *.
+        rewrite LibList.app_nil_r in *.
+        remember (iterated_looping_nodelist H n') as l.
+        destruct l; [unfold first in H1|]; discriminate.
+      * remember (iterated_looping_nodelist H n') as l.
+        destruct l; [rewrite LibList.app_nil_l|]; discriminate.
+    + destruct tl as [|hd' tl']; [simpl; now rewrite LibList.app_nil_r|].
+      remember (hd' :: tl') as tl.
+      assert (H3 : last (hd :: tl) = last tl). {
+        unfold last.
+        destruct tl; [simpl in *; discriminate|].
+        auto.
+      }
+      rewrite H3.
+      simpl.
+      rewrite last_append; [auto | rewrite Heqtl; discriminate].
+Qed.
+
+End LoopingNodelists.
+
+Section LoopingPaths.
+
+Definition looping_path (p : path) : Prop :=
+  looping_nodelist (proj1_sig p).
+
+Lemma iterated_looping_path_is_path : 
+  forall (p : path) (H : looping_path p) (n : nat),
+    is_path (iterated_looping_nodelist H n).
+Proof.
+  intros.
+  induction n as [| n']; [destruct p; now simpl|].
+  remember (iterated_looping_nodelist H n') as l.
+  destruct p as [p Hp].
+  simpl.
+  assert (H0 : (iterated_looping_nodelist H n' ++ List.tl p = l ++ List.tl p)%list). {
+    apply ListFacts.append_equals.
+    now symmetry.
+  }
+  assert (H1 : is_path (List.tl p)). {
+    induction p; auto.
+    unfold List.tl.
+    simpl in Hp.
+    destruct p; auto.
+    now destruct Hp as [H1 H2].
+  }
+  assert (H2 : is_path (l ++ List.tl p)%list). { 
+    remember (exist _ l IHn') as l_path.
+    assert (H3 : l = (proj1_sig l_path)) by (rewrite Heql_path; auto).
+    rewrite H3.
+    remember (exist _ p Hp) as p_path.
+    assert (H4 : p = (proj1_sig p_path)) by (rewrite Heqp_path; auto).
+    rewrite H4.
+    apply path_appending.
+    clear H1 H0.
+    rewrite Heql_path.
+    rewrite Heqp_path.
+    simpl.
+    pose proof iterated_looping_nodelist_loops H n' as G0.
+    unfold looping_nodelist in G0.
+    rewrite <- Heql in G0.
+    pose proof H as G1.
+    unfold looping_path in G1.
+    unfold looping_nodelist in G1.
+    rewrite Heqp_path in G1.
+    simpl in G1.
+    pose proof (iterated_looping_nodelist_share_endpoints H n') as G2.
+    rewrite <- Heql in G2.
+    rewrite Heqp_path in G2.
+    simpl in G2.
+    destruct G2 as [G2 G3].
+    symmetry.
+    rewrite G0.
+    apply G2.
+  }
+  rewrite Heql in H2.
+  auto.
+Qed.
+  
+Definition iterated_looping_path (p : path) (H : looping_path p) (n : nat) : path :=
+  let nodelist := proj1_sig p in
+    exist _ (iterated_looping_nodelist H n) (iterated_looping_path_is_path H n).
+
+End LoopingPaths.
+
+Section Cycles.
+
 Definition is_cyclic_path (p : path) : Prop :=
-  let node_list := proj1_sig p in
-    ListFacts.last node_list = ListFacts.first node_list /\
-    List.NoDup (List.tl node_list) /\
-    (List.length node_list > 1)%nat.
+  let nodelist := proj1_sig p in
+    ListFacts.last nodelist = ListFacts.first nodelist /\
+    List.NoDup (List.tl nodelist) /\
+    (List.length nodelist > 1)%nat.
 
 Definition is_cyclic_rule_graph : Prop :=
   exists (p : path), is_cyclic_path p.
@@ -237,8 +315,6 @@ Lemma cyclic_graph_implies_longer_path_exists :
     exists (p' : path), 
       List.length (proj1_sig p') > List.length (proj1_sig p).
 Proof.
-  intros.
-  destruct H as [p' H].
 Admitted.
 
 Lemma longer_path_exists_implies_cyclic_graph : 
@@ -248,35 +324,6 @@ Lemma longer_path_exists_implies_cyclic_graph :
   is_cyclic_rule_graph.
 Admitted.
 
-(* Holding area *)
-
-Lemma appending_cycle_preserves_endpoints : 
-  forall (p : path) 
-      (H : ListFacts.last (proj1_sig p) = ListFacts.first (proj1_sig p)),
-    let appended_path := path_append p p H in
-      ListFacts.last (proj1_sig appended_path) = ListFacts.first (proj1_sig appended_path).
-Proof.
-  intros.
-  destruct p as [p Hp].
-  simpl in *.
-  destruct p; auto.
-  simpl.
-  assert (H0 : ((r :: p) ++ p = r :: (p ++ p))%list) by auto.
-  rewrite H0.
-  pose proof (ListFacts.last_repeat p).
-  simpl.
-  destruct (p ++ p)%list eqn:Hp'; auto.
-  rewrite H1.
-  simpl in H.
-  destruct p; auto.
-  discriminate.
-Qed.
-
-Fixpoint iterated_cycle (p : path) (H : is_cyclic_path p) (n : nat) : path :=
-  match n with
-  | O     => exist _ ([])%list empty_path_is_path
-  | 1%nat => p
-  | S n'  => path_append (@iterated_cycle p H n') p (appending_cycle_preserves_endpoints p (proj1 H))
-  end.
+End Cycles.
 
 End RuleGraph.
