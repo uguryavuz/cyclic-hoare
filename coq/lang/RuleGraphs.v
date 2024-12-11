@@ -373,6 +373,30 @@ Lemma longer_path_exists_implies_cyclic_graph :
     exists (p' : path), 
       length (proj1_sig p') > length (proj1_sig p)) ->
   is_cyclic_rule_graph.
+Proof.
+  intros.
+  assert (H_empty : is_path ([])%list) by (now simpl).
+  remember (exist _ [] H_empty) as empty_path.
+  pose proof H as G.
+  specialize (G empty_path).
+  rewrite Heqempty_path in G.
+  simpl in G.
+  rewrite LibList.length_nil in G.
+  clear Heqempty_path empty_path H_empty.
+  destruct G as [ne_path H_ne].
+  assert (H_arb_len_path : forall (n : nat), 
+    exists (p : path), length (proj1_sig p) > n). {
+    intros.
+    induction n as [| n']; [now exists ne_path|].
+    destruct IHn' as [p H_p].
+    specialize (H p).
+    destruct H as [p' H_p'].
+    exists p'.
+    math.
+  }
+  clear H_ne ne_path.
+  specialize (H_arb_len_path (NodeSet.cardinal rg.(rg_nodes))) as G.
+  destruct G as [p H_p].
 Admitted.
 
 End Cycles.
