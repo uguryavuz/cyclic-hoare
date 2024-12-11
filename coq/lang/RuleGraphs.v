@@ -232,6 +232,21 @@ Proof.
       rewrite last_append; [auto | rewrite Heqtl; discriminate].
 Qed.
 
+Lemma iterated_looping_nodelist_length : 
+  forall (p : list rg_node) (H : looping_nodelist p) (n : nat),
+    length (iterated_looping_nodelist H n) = ((length p) + n * (length (List.tl p)))%nat.
+Proof.
+  intros.
+  induction n as [| n']; [simpl; math|].
+  remember (iterated_looping_nodelist H n') as l.
+  simpl.
+  rewrite LibList.length_app.
+  rewrite <- Heql.
+  remember (List.tl p) as tl.
+  rewrite IHn'.
+  math.
+Qed.
+
 End LoopingNodelists.
 
 Section LoopingPaths.
@@ -302,9 +317,9 @@ Section Cycles.
 
 Definition is_cyclic_path (p : path) : Prop :=
   let nodelist := proj1_sig p in
-    ListFacts.last nodelist = ListFacts.first nodelist /\
+    looping_nodelist nodelist /\
     List.NoDup (List.tl nodelist) /\
-    (List.length nodelist > 1)%nat.
+    (length nodelist > 1)%nat.
 
 Definition is_cyclic_rule_graph : Prop :=
   exists (p : path), is_cyclic_path p.
@@ -313,14 +328,50 @@ Lemma cyclic_graph_implies_longer_path_exists :
   is_cyclic_rule_graph ->
   forall (p : path), 
     exists (p' : path), 
-      List.length (proj1_sig p') > List.length (proj1_sig p).
+      length (proj1_sig p') > length (proj1_sig p).
 Proof.
-Admitted.
+  intros.
+  destruct p as [p Hp].
+  simpl.
+  destruct p as [| hd tl] eqn:Hpdef.
+  + rewrite LibList.length_nil.
+    unfold is_cyclic_rule_graph in H.
+    destruct H as [cyclic_path Hcyc].
+    destruct Hcyc as [H1 [H2 H3]].
+    exists cyclic_path.
+    math.
+  + rewrite <- Hpdef.
+    assert (H1 : (length p > 0)%nat). {
+      rewrite Hpdef.
+      rewrite LibList.length_cons.
+      math.
+    }
+    remember (length p) as n.
+    unfold is_cyclic_rule_graph in H.
+    destruct H as [cyclic_path Hcyc].
+    destruct Hcyc as [H2 [H3 H4]].
+    exists (@iterated_looping_path cyclic_path H2 n).
+    simpl.
+    rewrite iterated_looping_nodelist_length.
+    destruct cyclic_path.
+    clear H2 H3 Hpdef Hp hd tl Heqn p.
+    simpl in *.
+    assert (H2 : (length (List.tl x) > 0)%nat). {
+      destruct x.
+      rewrite LibList.length_nil in H4; math.
+      unfold List.tl; rewrite LibList.length_cons in H4; math.
+    }
+    remember (length (List.tl x)) as m.
+    remember (length x) as k.
+    clear Heqm Heqk i x rg.
+    destruct n; [math|].
+    destruct m; math.
+Qed.
 
 Lemma longer_path_exists_implies_cyclic_graph : 
   (forall (p : path), 
     exists (p' : path), 
-      List.length (proj1_sig p') > List.length (proj1_sig p)) ->
+      length (proj1_sig p') > length (proj1_sig p)) ->
   is_cyclic_rule_graph.
 Admitted.
 
