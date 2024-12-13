@@ -211,6 +211,17 @@ Module ListFacts.
     auto.
   Qed.
 
+  Lemma last_exists : forall (tl : list A) (a : A),
+    last (a :: tl) <> None.
+  Proof.
+    induction tl.
+    discriminate.
+    intro.
+    replace (a0 :: a :: tl) with (([a0])%list ++ a :: tl) by auto.
+    rewrite last_append. 2 : discriminate.
+    auto.
+  Qed.
+  
   Lemma append_equals : forall (l1 l2 l' : list A),
     l1 = l2 ->
     l1 ++ l' = l2 ++ l'.

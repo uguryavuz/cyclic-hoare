@@ -31,7 +31,7 @@ Variant rule_or_lift : Type :=
 
 Inductive rule_graph : Type := {
   rg_nodes : NodeSet.t;
-  rg_node  : Type := {nd | NodeSet.mem nd rg_nodes};
+  rg_node  : Type := {nd | NodeSet.In nd rg_nodes};
   rg_conc  : rg_node -> stmt;
   rg_rule  : rg_node -> rule_or_lift;
   rg_prems : rg_node -> list rg_node;
@@ -103,6 +103,11 @@ Qed.
 Definition path_append (p p' : path) 
     (H : ListFacts.last (proj1_sig p) = ListFacts.first (proj1_sig p')) : path :=
   exist _ ((proj1_sig p) ++ List.tl (proj1_sig p'))%list (path_appending p p' H).
+
+Lemma path_decomposing : forall (nl1 nl2 : list rg_node),
+  is_path (nl1 ++ nl2)%list ->
+  is_path nl1 /\ is_path nl2.
+Admitted.
 
 End PathAppending.
 
@@ -368,6 +373,171 @@ Proof.
     destruct m; math.
 Qed.
 
+Fact path_longer_than_card_has_dupes :
+  forall (p : path),
+    let nodelist := proj1_sig p in 
+      length nodelist > cardinal rg.(rg_nodes) ->
+      ~ List.NoDup nodelist.
+Proof.
+  intros.
+  contra H.
+  rewrite ngt_as_le.
+  generalize dependent nodelist.
+  induction nodelist. { rewrite LibList.length_nil. math. }
+  intros.
+  inverts H.
+  specialize (IHnodelist H3).
+  rewrite length_cons.
+  simpl.
+  apply le_case_eq_lt in IHnodelist.
+  destruct IHnodelist. 2 : math.
+  contradict H2.
+  rewrite cardinal_1 in H.
+Admitted.
+
+Fact empty_path_is_path : is_path ([]%list).
+Proof. now simpl. Qed.
+
+Definition empty_path : path := 
+  exist _ [] empty_path_is_path.
+
+Lemma is_path_single : 
+  forall (nd : rg_node),
+    is_path ([nd])%list.
+Proof.
+  intros.
+  now simpl.
+Qed.
+
+Definition single_path (nd : rg_node) : path :=
+  exist _ _ (is_path_single nd).
+
+Fact path_with_dupes_helper : 
+  forall (n : nat) (p : path),
+    let nodelist := proj1_sig p in
+      length nodelist < n -> 
+      ~ List.NoDup nodelist ->
+      exists p1 p2 p3 H1 H2,
+        p = path_append (path_append p1 p2 H1) p3 H2 /\
+        is_cyclic_path p2.
+Proof.
+  induction n.
+  math.
+  intros.
+  assert (H1 : length nodelist <= n) by math.
+  apply le_case_eq_lt in H1.
+  destruct H1. 2 : now specialize (IHn p H1 H0).
+  destruct (classic (is_cyclic_path p)). {
+    remember (ListFacts.first nodelist) as first_nd.
+    remember (ListFacts.last nodelist) as last_nd.
+    destruct first_nd. 2 : {
+      destruct H2.
+      destruct H3.
+      subst.
+      clear H3 H2 H0 IHn H.
+      subst nodelist.
+      destruct (proj1_sig p).
+      rewrite LibList.length_nil in H4. math.
+      discriminate.
+    }
+    destruct last_nd. 2 : {
+      destruct H2.
+      destruct H3.
+      subst.
+      clear H3 H2 H0 IHn H.
+      subst nodelist.
+      destruct (proj1_sig p).
+      rewrite LibList.length_nil in H4. math.
+      contradict Heqlast_nd.
+      symmetry.
+      apply ListFacts.last_exists.
+    }
+    exists (single_path r) p (single_path r0).
+    exists.
+    split. 2 : auto.
+    unfold path_append.
+    simpls.
+    subst nodelist.
+    destruct p.
+    simpls.
+    apply exist_eq_exist.
+    rewrite LibList.app_nil_r.
+    rewrite LibList.app_cons_one_r.
+    destruct x.
+    discriminate.
+    simpls.
+    now injects Heqfirst_nd.
+  }
+  destruct nodelist as [|hd tl] eqn:Heqn.
+  contradict H0.
+  apply List.NoDup_nil.
+  rewrite List.NoDup_cons_iff in H0.
+  rewrite not_and_eq in H0.
+  rewrite not_not_eq in H0.
+  destruct H0. 2 : {
+    assert (H3 : length tl < n).
+    rewrite LibList.length_cons in H1.
+    math.
+    assert (H4 : is_path tl). {
+      subst nodelist.
+      destruct p.
+      simpls.
+      destruct x.
+      discriminate.
+      injects Heqn.
+      destruct tl.
+      auto.
+      simpls.
+      destruct i.
+      auto.
+    } 
+    specialize (IHn (exist _ _ H4)).
+    simpls.
+    specialize (IHn H3 H0).
+    exists* IHn.
+    subst nodelist.
+    clear H3 H2 H1 H0 H n.
+    sort.
+    destruct p as [nl Hp].
+    simpls.
+    subst.
+    assert (G : is_path (hd :: (proj1_sig p1))). {
+      injects IHn.
+      rewrite <- app_cons_l in Hp.
+      apply path_decomposing in Hp.
+      destruct Hp.
+      rewrite <- app_cons_l in H.
+      apply path_decomposing in H.
+      destruct H.
+      auto.
+    }
+    exists (exist _ _ G) p2 p3.
+    exists.
+    splits~.
+    apply exist_eq_exist.
+    simpls.
+    clear G IHn0 Hp.
+    rewrite 2!app_cons_l.
+    f_equal.
+    injects IHn.
+    auto.
+  }
+Admitted.
+
+Fact path_with_dupes_has_cycle :
+  forall (p : path),
+    let nodelist := proj1_sig p in
+      ~ List.NoDup nodelist ->
+      exists p1 p2 p3 H1 H2,
+        p = path_append (path_append p1 p2 H1) p3 H2 /\
+        is_cyclic_path p2.
+Proof.
+  intros.
+  remember (S (length nodelist)) as n.
+  assert (H1 : length nodelist < n) by math.
+  apply (path_with_dupes_helper p H1 H).
+Qed.
+ 
 Lemma longer_path_exists_implies_cyclic_graph : 
   (forall (p : path), 
     exists (p' : path), 
@@ -397,7 +567,11 @@ Proof.
   clear H_ne ne_path.
   specialize (H_arb_len_path (NodeSet.cardinal rg.(rg_nodes))) as G.
   destruct G as [p H_p].
-Admitted.
+  unfold is_cyclic_rule_graph.
+  apply path_longer_than_card_has_dupes, path_with_dupes_has_cycle in H_p.
+  exists* H_p.
+  now exists p2.
+Qed.
 
 End Cycles.
 
