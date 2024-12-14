@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 From Lang Require Export Util.
 From Coq Require Import Structures.OrderedTypeEx.
-From Coq Require FSetList FSetFacts.
+From Coq Require FSetList FSetFacts FSetProperties.
 
 Variable stmt : Type.
 Variable liftable : stmt -> Prop.
@@ -24,6 +24,7 @@ Notation node := Node.t.
 
 Module Import NodeSet := FSetList.Make(Node).
 Module NodeSetFacts := FSetFacts.Facts(NodeSet).
+Module NodeSetProperties := FSetProperties.Properties(NodeSet).
 
 Variant rule_or_lift : Type :=
   | Rule (r : rule) 
@@ -373,6 +374,64 @@ Proof.
     destruct m; math.
 Qed.
 
+Fact no_dup_list_of_length_card_contains_all_elements :
+  forall (n : nat) (node_set : NodeSet.t),
+    n = cardinal node_set -> 
+    forall (l : list {nd | NodeSet.In nd node_set}),
+      n = length l ->
+      List.NoDup l ->
+      forall (nd : {nd | NodeSet.In nd node_set}),
+        List.In nd l.
+Proof.
+  clear rg.
+  induction n.
+  intros.
+  destruct nd.
+  contradict i.
+  assert (H2 : Empty node_set). {
+    rewrite cardinal_1 in H.
+    unfold Datatypes.length in H.
+    destruct (elements node_set) eqn:Heq; [|math].
+    now apply NodeSetProperties.elements_Empty.
+  }
+  now specialize (H2 x).
+  intros.
+  remember (NodeSet.remove (proj1_sig nd) node_set) as node_set'.
+  specialize (IHn node_set').
+  assert (H3 : n = cardinal node_set'). {
+    rewrite Heqnode_set'.
+    pose proof NodeSetProperties.remove_cardinal_1 as G.
+    specialize (G node_set (proj1_sig nd)).
+    rewrite <- H in G.
+    rewrite Nat.succ_inj_wd in G.
+    symmetry.
+    apply G.
+    destruct nd.
+    now simpl.
+  }
+  specialize (IHn H3).
+  assert (H4 : forall n1 n2 : {nd : elt | In nd node_set }, {n1 = n2} + {n1 <> n2}). {
+    clear H3 Heqnode_set' nd H1 H0 l H IHn node_set' n.
+    intros.
+    destruct n1 as [n1 Hn1], n2 as [n2 Hn2].
+    destruct (Node.eq_dec n1 n2).
+    + left.
+      apply exist_eq_exist.
+      auto.
+    + right.
+      intros G.
+      injects G.
+      contradiction.
+  }
+  remember (List.remove H4 nd l) as l'.
+  clear H3 H.
+  sort.
+  (* Should map l' to type {nd | NodeSet.In nd node_set'} first *)
+  assert (H5 : n = length l'). {
+    admit.
+  }
+Admitted.
+
 Fact path_longer_than_card_has_dupes :
   forall (p : path),
     let nodelist := proj1_sig p in 
@@ -392,8 +451,10 @@ Proof.
   apply le_case_eq_lt in IHnodelist.
   destruct IHnodelist. 2 : math.
   contradict H2.
-  rewrite cardinal_1 in H.
-Admitted.
+  pose proof no_dup_list_of_length_card_contains_all_elements.
+  specialize (H0 (cardinal rg.(rg_nodes)) (rg.(rg_nodes))).
+  auto.
+Qed.
 
 Fact empty_path_is_path : is_path ([]%list).
 Proof. now simpl. Qed.
@@ -522,6 +583,7 @@ Proof.
     injects IHn.
     auto.
   }
+
 Admitted.
 
 Fact path_with_dupes_has_cycle :
