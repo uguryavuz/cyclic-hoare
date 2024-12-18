@@ -296,6 +296,14 @@ Module ListFacts.
     apply H in H0. subst~.
   Qed.
 
+  Lemma length_datatypes_length {A} (l:list A) :
+    length l = Datatypes.length l.
+  Proof.
+    induction l. auto.
+    rewrite length_cons. simpls.
+    math.
+  Qed.
+
   
 End ListFacts.
 Export ListFacts.
