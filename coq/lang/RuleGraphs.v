@@ -3,19 +3,6 @@ From Lang Require Export Util.
 From Coq Require Import Structures.OrderedTypeEx.
 From Coq Require FSetList FSetFacts FSetProperties.
 
-Variable stmt : Type.
-Variable liftable : stmt -> Prop.
-Variable valid_stmt : stmt -> Prop.
-
-Variable rule : Type.
-Variable valid_rule : rule -> list stmt -> stmt -> Prop.
-
-Definition sound_rule (r : rule) : Prop :=
-  forall (prems : list stmt) (conc : stmt),
-    valid_rule r prems conc ->
-      LibList.Forall valid_stmt prems ->
-      valid_stmt conc.  
-
 Module Node <: UsualOrderedType.
   Include Nat_as_OT.
 End Node.
@@ -26,18 +13,16 @@ Module Import NodeSet := FSetList.Make(Node).
 Module NodeSetFacts := FSetFacts.Facts(NodeSet).
 Module NodeSetProperties := FSetProperties.Properties(NodeSet).
 
-Definition dommem dom := {nd | NodeSet.In nd dom}.
+Section Nodes.
 
-Definition proj_into_subdom
-  (dom:t) (e:elt)
-  (e':dommem dom) (H:e <> proj1_sig e') 
-  : dommem (remove e dom) :=
-  exist (fun e' => In e' (remove e dom)) (proj1_sig e') 
-  (@remove_2 dom e (proj1_sig e') H (proj2_sig e')).
+Variable dom : NodeSet.t.
 
+Definition dommem := {nd | NodeSet.In nd dom}.
+
+Definition nodelist := list dommem.
 
 Lemma nodelist_pigeon : 
-  forall (dom : NodeSet.t) (l : list (dommem dom)),
+  forall (l : nodelist),
   length l > cardinal dom ->
   ~ List.NoDup l.
 Proof.
@@ -74,6 +59,78 @@ Proof.
   apply eq_sig_hprop; auto.
   intros. apply proof_irrelevance.
 Qed.
+
+
+Lemma nodelist_pigeon' : 
+  forall (l : nodelist),
+  List.NoDup l ->
+  length l <= cardinal dom.
+Proof.
+  intros. contra H.
+  apply nodelist_pigeon. math.
+Qed.
+
+Fact nodelist_all_elems :
+  forall (l : nodelist),
+  length l = cardinal dom ->
+  List.NoDup l ->
+  forall (x:dommem),
+  List.In x l.
+Proof.
+  intros. destruct x as (e&Ie). sort.
+  rewrite cardinal_1 in H.
+  assert (List.incl (elements dom)
+    (List.map (@proj1_sig elt (fun nd => NodeSet.In nd dom)) l)).
+  {
+    apply List.NoDup_length_incl.
+    - apply nodup_inj; auto.
+      unfolds. intros.
+      apply eq_sig_hprop in H1. subst~.
+      intros. apply proof_irrelevance.
+    - rewrite <- H, List.map_length, length_datatypes_length.
+      auto.
+    - unfolds. intros. sort.
+      apply List.in_map_iff in H1.
+      exists* H1. destruct x. simpls. subst.
+      dup_hyp i.
+      rewrite NodeSetFacts.elements_iff in i0.
+      apply SetoidList.InA_alt in i0. exists* i0.
+      now subst.
+  }
+  specializes H1 e. specializes H1.
+  { apply elements_1 in Ie.
+    apply SetoidList.InA_alt in Ie.
+    exists* Ie. subst~. }
+  apply List.in_map_iff in H1.
+  exists* H1. destruct x. simpls.
+  subst. replace Ie with i.
+  auto. apply proof_irrelevance.
+Qed.
+
+End Nodes.
+
+Definition proj_into_subdom
+  (dom:t) (e:elt)
+  (e':dommem dom) (H:e <> proj1_sig e') 
+  : dommem (remove e dom) :=
+  exist (fun e' => In e' (remove e dom)) (proj1_sig e') 
+  (@remove_2 dom e (proj1_sig e') H (proj2_sig e')).
+
+
+
+
+Variable stmt : Type.
+Variable liftable : stmt -> Prop.
+Variable valid_stmt : stmt -> Prop.
+
+Variable rule : Type.
+Variable valid_rule : rule -> list stmt -> stmt -> Prop.
+
+Definition sound_rule (r : rule) : Prop :=
+  forall (prems : list stmt) (conc : stmt),
+    valid_rule r prems conc ->
+      LibList.Forall valid_stmt prems ->
+      valid_stmt conc.  
 
 
 Variant rule_or_lift : Type :=
@@ -432,64 +489,6 @@ Proof.
     destruct n; [math|].
     destruct m; math.
 Qed.
-
-Fact no_dup_list_of_length_card_contains_all_elements :
-  forall (n : nat) (node_set : NodeSet.t),
-    n = cardinal node_set -> 
-    forall (l : list {nd | NodeSet.In nd node_set}),
-      n = length l ->
-      List.NoDup l ->
-      forall (nd : {nd | NodeSet.In nd node_set}),
-        List.In nd l.
-Proof.
-  clear rg.
-  induction n.
-  intros.
-  destruct nd.
-  contradict i.
-  assert (H2 : Empty node_set). {
-    rewrite cardinal_1 in H.
-    unfold Datatypes.length in H.
-    destruct (elements node_set) eqn:Heq; [|math].
-    now apply NodeSetProperties.elements_Empty.
-  }
-  now specialize (H2 x).
-  intros.
-  remember (NodeSet.remove (proj1_sig nd) node_set) as node_set'.
-  specialize (IHn node_set').
-  assert (H3 : n = cardinal node_set'). {
-    rewrite Heqnode_set'.
-    pose proof NodeSetProperties.remove_cardinal_1 as G.
-    specialize (G node_set (proj1_sig nd)).
-    rewrite <- H in G.
-    rewrite Nat.succ_inj_wd in G.
-    symmetry.
-    apply G.
-    destruct nd.
-    now simpl.
-  }
-  specialize (IHn H3).
-  assert (H4 : forall n1 n2 : {nd : elt | In nd node_set }, {n1 = n2} + {n1 <> n2}). {
-    clear H3 Heqnode_set' nd H1 H0 l H IHn node_set' n.
-    intros.
-    destruct n1 as [n1 Hn1], n2 as [n2 Hn2].
-    destruct (Node.eq_dec n1 n2).
-    + left.
-      apply exist_eq_exist.
-      auto.
-    + right.
-      intros G.
-      injects G.
-      contradiction.
-  }
-  remember (List.remove H4 nd l) as l'.
-  clear H3 H.
-  sort.
-  (* Should map l' to type {nd | NodeSet.In nd node_set'} first *)
-  assert (H5 : n = length l'). {
-    admit.
-  }
-Admitted.
 
 Fact path_longer_than_card_has_dupes :
   forall (p : path),
