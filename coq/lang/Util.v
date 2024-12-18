@@ -279,6 +279,24 @@ Module ListFacts.
     proj1_sig (constructive_definite_description _ (nonempty_last H)).
 
   End FirstLast.
+
+
+  Lemma nodup_inj {A B} (f:A->B) (l:list A) :
+    injective f ->
+    List.NoDup l ->
+    List.NoDup (List.map f l).
+  Proof.
+    intro. induction l.
+    { intro. simpls. apply List.NoDup_nil. }
+    intros. simpls.
+    apply List.NoDup_cons_iff in H0 as (?&?).
+    apply List.NoDup_cons_iff. splits~.
+    contra H0.
+    apply List.in_map_iff in H0. exists* H0.
+    apply H in H0. subst~.
+  Qed.
+
+  
 End ListFacts.
 Export ListFacts.
 
@@ -1963,3 +1981,48 @@ Section MapMem.
     proj1_sig (constructive_definite_description _ (mapmem_ex sub_refl)).
     
 End MapMem.
+
+
+(*Section MapMemProperties.
+
+  Variable A B : Type.
+
+  Check mapmem_aux.
+
+  Lemma mapmem_length_aux (l : list A) f :
+    forall (l' : list B) sl,
+    sub l sl ->
+    mapmem_aux l f sl l' ->
+    length sl = length l'.
+  Proof.
+    induction l.
+    { intros. inverts~ H0. inverts H1. }
+    intros. inverts~ H0.
+    do 2 rewrite length_cons. simpls. f_equal.
+    destruct H1.
+    - subst. applys IHl.
+      unfolds in H. unfolds. intros.
+      apply List.in_cons with (a:=a0) in H0.
+      apply H in H0.
+      Search List.In cons.
+
+
+
+  Lemma mapmem_length (l:list A) (f: forall a : A, List.In a l -> B) :
+    List.length (mapmem l f) = length l.
+  Proof.
+    induction l.
+    { rewrite length_nil.
+      apply List.length_zero_iff_nil.
+      unfold mapmem. destruct (constructive_definite_description _).
+      simpls. inverts~ m. }
+    rewrite length_cons.
+    unfold mapmem. destruct (constructive_definite_description _).
+    simpls. inverts~ m. simpls.
+    specializes IHl. 
+    rewrite <- IHl. f_equal.
+    inverts R.
+    { simpls. now rewrite length_nil. }
+    simpls.
+
+    *)

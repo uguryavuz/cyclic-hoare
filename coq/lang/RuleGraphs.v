@@ -26,6 +26,170 @@ Module Import NodeSet := FSetList.Make(Node).
 Module NodeSetFacts := FSetFacts.Facts(NodeSet).
 Module NodeSetProperties := FSetProperties.Properties(NodeSet).
 
+Section Pigeon.
+
+Definition dommem dom := {nd | NodeSet.In nd dom}.
+
+Definition proj_into_subdom
+  (dom:t) (e:elt)
+  (e':dommem dom) (H:e <> proj1_sig e') 
+  : dommem (remove e dom) :=
+  exist (fun e' => In e' (remove e dom)) (proj1_sig e') 
+  (@remove_2 dom e (proj1_sig e') H (proj2_sig e')).
+
+
+
+Lemma nodelist_pigeon_aux : 
+  forall (dom : NodeSet.t) (l : list (dommem dom)),
+  length l > cardinal dom ->
+  ~ List.NoDup l.
+Proof.
+  intros. intro.
+  assert (List.incl 
+    (List.map (@proj1_sig elt (fun nd => NodeSet.In nd dom)) l) 
+    (elements dom)
+  ). {
+    unfolds. intros. sort.
+    apply List.in_map_iff in H1.
+    exists* H1. destruct x. simpls. subst.
+    dup_hyp i.
+    rewrite NodeSetFacts.elements_iff in i0.
+    apply SetoidList.InA_alt in i0. exists* i0.
+    now subst.
+  }
+  apply (List.NoDup_incl_length) in H1.
+  rewrite cardinal_1 in *.
+  rewrite List.map_length in H1.
+  replace (length l) with (Datatypes.length l) in *.
+  contradict H. rewrite ngt_as_le. auto.
+  { clear. induction l. auto.
+    rewrite length_cons. simpls.
+    math. }
+  destruct l.
+  { simpls. apply List.NoDup_nil. }
+  apply List.NoDup_cons.
+  { intro. simpls.
+    apply List.NoDup_cons_iff in H0 as (?&?).
+    contradict H0.
+    apply List.in_map_iff in H2. exists* H2.
+    apply eq_sig_hprop in H2. subst~.
+    intros. apply proof_irrelevance. }
+  apply nodup_inj.
+  2: { now apply List.NoDup_cons_iff in H0 as (?&?). }
+  unfolds. intros.
+  apply eq_sig_hprop; auto.
+  intros. apply proof_irrelevance.
+Qed.
+
+
+
+  apply List.NoDup_cons_iff in H1 as (?&?).
+  Search List.NoDup List.map.
+
+  contra H. apply List.in_map_iff in H.
+  exists* H.
+  apply eq_sig_hprop in H. subst~.
+  intros. apply proof_irrelevance.
+
+   generalize dependent l.
+  induction l.
+  { simpls. intros. apply List.NoDup_nil. }
+  intros. simpls. apply List.NoDup_cons.
+  2: { 
+    apply IHl.
+    now apply List.NoDup_cons_iff in H1 as (?&?).
+    now apply List.incl_cons_inv in H2 as (?&?). 
+  }
+  apply List.NoDup_cons_iff in H1 as (?&?).
+  contra H. apply List.in_map_iff in H.
+  exists* H.
+  apply eq_sig_hprop in H. subst~.
+  intros. apply proof_irrelevance.
+Qed.
+
+   Search (proj1_sig _ = proj1_sig _). eq. injects H. destruct x. inverts H. simpls. subst.
+
+  remember (List.map _) as f.
+  apply List.incl_cons_inv in H2 as (?&?).
+
+  intro. specializes IHl H0.
+  
+  
+
+
+  induction n. { math. }
+  intros.
+  pose proof cardinal_1. rewrite H1 in *.
+  destruct (choose dom) eqn:E.
+  2: {
+    apply choose_2 in E. unfolds in E.
+    destruct l. contradict H0.
+    rewrite length_nil. math.
+    destruct d. now specializes E x.
+  }
+  sort. apply choose_1 in E.
+  remember (exist (fun nd => In nd dom) e E) as x.
+  assert (List.In x l).
+  { apply absurds_lemma. intro.
+    admit. }
+  assert (forall (a a' : dommem dom), {a=a'} + {a<>a'}).
+  { intros. destruct a, a'. pose proof Node.eq_dec x0 x1.
+    destruct H3. subst. left. apply~ exist_eq_exist.
+    right. intro. injects~ H3. }
+  remember (remove e dom) as dom'.
+  remember (List.remove X x l) as l'. sort.
+  intro.
+  assert (forall el, List.In el l' -> e <> proj1_sig el).
+  { admit. }
+  remember (mapmem l' (
+    fun e' H =>
+    @proj_into_subdom dom e e' (H4 e' H)
+  )) as l''. subst dom'.
+
+  specializes IHn (remove e dom) l''.
+  assert (cardinal (remove e dom) = pred (cardinal dom)).
+  { admit. }
+  specializes IHn.
+  { rewrite H5, cardinal_1. 
+    destruct (Datatypes.length (elements dom)) eqn:F.
+    2: math. false.
+    apply List.length_zero_iff_nil in F.
+    apply elements_1 in E as ?.
+    rewrite F in *.
+    now apply SetoidList.InA_nil in H6. }
+  { rewrite H5, cardinal_1.
+    rewrite Heql''.
+    replace (length (mapmem l' _)) with (length l').
+    2: {
+      admit.
+    }
+    contra H0. rewrite ngt_as_le in *.
+    clear Heql''.
+    repeat rewrite cardinal_1 in H5.
+    rewrite <- H5 in H0.
+    pose proof List.remove_length_lt X l x H2.
+    rewrite <- Heql' in *.
+    Search Datatypes.length List.NoDup.
+    
+
+    rewrite Heql'.
+    admit. }
+  contra IHn. admit.
+Admitted.
+
+
+
+Lemma nodelist_pigeon : 
+  forall (dom : NodeSet.t) (l : list {nd | NodeSet.In nd dom}),
+  length l > cardinal dom ->
+  ~ List.NoDup l.
+Proof.
+  intros.
+  applys~ nodelist_pigeon_aux (S (cardinal dom)). math.
+Qed.
+
+
+
 Variant rule_or_lift : Type :=
   | Rule (r : rule) 
   | Lift.
@@ -108,6 +272,15 @@ Definition path_append (p p' : path)
 Lemma path_decomposing : forall (nl1 nl2 : list rg_node),
   is_path (nl1 ++ nl2)%list ->
   is_path nl1 /\ is_path nl2.
+Proof.
+  induction nl1.
+  { easy. }
+  intro. generalize dependent nl1.
+  induction nl2.
+  { intros. rewrite app_nil_r in H. now splits~. }
+  intros.
+  
+    
 Admitted.
 
 End PathAppending.
@@ -438,7 +611,10 @@ Fact path_longer_than_card_has_dupes :
       length nodelist > cardinal rg.(rg_nodes) ->
       ~ List.NoDup nodelist.
 Proof.
-  intros.
+  intros. now apply nodelist_pigeon.
+Qed.
+  
+  (*intros.
   contra H.
   rewrite ngt_as_le.
   generalize dependent nodelist.
@@ -451,10 +627,8 @@ Proof.
   apply le_case_eq_lt in IHnodelist.
   destruct IHnodelist. 2 : math.
   contradict H2.
-  pose proof no_dup_list_of_length_card_contains_all_elements.
-  specialize (H0 (cardinal rg.(rg_nodes)) (rg.(rg_nodes))).
-  auto.
-Qed.
+  rewrite cardinal_1 in H.
+Admitted.*)
 
 Fact empty_path_is_path : is_path ([]%list).
 Proof. now simpl. Qed.
