@@ -60,7 +60,6 @@ Proof.
   intros. apply proof_irrelevance.
 Qed.
 
-
 Lemma nodelist_pigeon' : 
   forall (l : nodelist),
   List.NoDup l ->
@@ -110,14 +109,10 @@ Qed.
 End Nodes.
 
 Definition proj_into_subdom
-  (dom:t) (e:elt)
-  (e':dommem dom) (H:e <> proj1_sig e') 
-  : dommem (remove e dom) :=
+  (dom:t) (e:elt) (e':dommem dom) (H:e <> proj1_sig e') : 
+    dommem (remove e dom) :=
   exist (fun e' => In e' (remove e dom)) (proj1_sig e') 
-  (@remove_2 dom e (proj1_sig e') H (proj2_sig e')).
-
-
-
+    (@remove_2 dom e (proj1_sig e') H (proj2_sig e')).
 
 Variable stmt : Type.
 Variable liftable : stmt -> Prop.
@@ -131,7 +126,6 @@ Definition sound_rule (r : rule) : Prop :=
     valid_rule r prems conc ->
       LibList.Forall valid_stmt prems ->
       valid_stmt conc.  
-
 
 Variant rule_or_lift : Type :=
   | Rule (r : rule) 
@@ -212,19 +206,56 @@ Definition path_append (p p' : path)
     (H : ListFacts.last (proj1_sig p) = ListFacts.first (proj1_sig p')) : path :=
   exist _ ((proj1_sig p) ++ List.tl (proj1_sig p'))%list (path_appending p p' H).
 
+Fact empty_path_is_path : is_path ([]%list).
+Proof. now simpl. Qed.
+
+Definition empty_path : path := 
+  exist _ [] empty_path_is_path.
+
+Lemma is_path_single : 
+  forall (nd : rg_node),
+    is_path ([nd])%list.
+Proof.
+  intros.
+  now simpl.
+Qed.
+
+Definition single_path (nd : rg_node) : path :=
+  exist _ _ (is_path_single nd).
+
 Lemma path_decomposing : forall (nl1 nl2 : list rg_node),
   is_path (nl1 ++ nl2)%list ->
   is_path nl1 /\ is_path nl2.
 Proof.
-  induction nl1.
-  { easy. }
-  intro. generalize dependent nl1.
-  induction nl2.
-  { intros. rewrite app_nil_r in H. now splits~. }
-  intros.
-  
-    
-Admitted.
+  intros; split.
+  - induction nl1.
+    apply empty_path_is_path.
+    rewrite app_cons_l in H.
+    destruct (nl1 ++ nl2)%list eqn:Hnl.
+    + assert (H1 : nl1 = []). {
+        destruct nl1; auto. discriminate.
+      }
+      rewrite H1.
+      apply is_path_single.
+    + destruct H.
+      destruct nl1.
+      apply is_path_single.
+      replace r0 with r in * by now inverts Hnl.
+      specialize (IHnl1 H0).
+      unfold is_path.
+      auto.
+  - induction nl1.
+    now rewrite app_nil_l in H.
+    rewrite app_cons_l in H.
+    destruct (nl1 ++ nl2)%list eqn:Hnl.
+    + destruct nl2.
+      apply empty_path_is_path.
+      contradict Hnl.
+      destruct nl1; discriminate.
+    + unfold is_path in H.
+      destruct H.
+      auto.
+Qed.
 
 End PathAppending.
 
@@ -498,23 +529,6 @@ Fact path_longer_than_card_has_dupes :
 Proof.
   intros. now apply nodelist_pigeon.
 Qed.
-
-Fact empty_path_is_path : is_path ([]%list).
-Proof. now simpl. Qed.
-
-Definition empty_path : path := 
-  exist _ [] empty_path_is_path.
-
-Lemma is_path_single : 
-  forall (nd : rg_node),
-    is_path ([nd])%list.
-Proof.
-  intros.
-  now simpl.
-Qed.
-
-Definition single_path (nd : rg_node) : path :=
-  exist _ _ (is_path_single nd).
 
 Fact path_with_dupes_helper : 
   forall (n : nat) (p : path),
