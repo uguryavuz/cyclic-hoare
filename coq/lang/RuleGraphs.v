@@ -532,26 +532,26 @@ Qed.
 
 Fact path_with_dupes_helper : 
   forall (n : nat) (p : path),
-    let nodelist := proj1_sig p in
-      length nodelist < n -> 
-      ~ List.NoDup nodelist ->
+    let ndlist := proj1_sig p in
+      length ndlist < n -> 
+      ~ List.NoDup ndlist ->
       exists p1 p2 p3 H1 H2,
         p = path_append (path_append p1 p2 H1) p3 H2 /\
         is_cyclic_path p2.
 Proof.
   induction n. math.
   intros.
-  assert (H1 : length nodelist <= n) by math.
+  assert (H1 : length ndlist <= n) by math.
   apply le_case_eq_lt in H1.
   destruct H1. 2 : now specialize (IHn p H1 H0).
   destruct (classic (is_cyclic_path p)). 
   (* Case 1: entire path is simple cycle *)
-  { remember (ListFacts.first nodelist) as first_nd.
-    remember (ListFacts.last nodelist) as last_nd.
+  { remember (ListFacts.first ndlist) as first_nd.
+    remember (ListFacts.last ndlist) as last_nd.
     destruct first_nd. 2 : {
       destruct H2. destruct H3. subst.
       clear H3 H2 H0 IHn H.
-      subst nodelist.
+      subst ndlist.
       destruct (proj1_sig p).
       rewrite LibList.length_nil in H4. math.
       discriminate.
@@ -559,7 +559,7 @@ Proof.
     destruct last_nd. 2 : {
       destruct H2. destruct H3. subst.
       clear H3 H2 H0 IHn H.
-      subst nodelist.
+      subst ndlist.
       destruct (proj1_sig p).
       rewrite LibList.length_nil in H4. math.
       contradict Heqlast_nd.
@@ -569,26 +569,29 @@ Proof.
     exists (single_path r) p (single_path r0).
     exists. split~.
     unfold path_append. simpls.
-    subst nodelist. destruct p.
+    subst ndlist. destruct p.
     simpls. apply exist_eq_exist.
     rewrite LibList.app_nil_r.
     rewrite LibList.app_cons_one_r.
     destruct x. discriminate.
     simpls. now injects Heqfirst_nd.
   }
-  destruct nodelist as [|hd tl] eqn:Heqn.
+  destruct ndlist as [|hd tl] eqn:Heqn.
   contradict H0. apply List.NoDup_nil.
   rewrite List.NoDup_cons_iff in H0.
   repeat rewrite not_and_eq in H0.
   destruct H0.
-  {
-
+  (* Case 2: head of path repeats somewhere *)
+  { remember (ListFacts.last tl) as last_nd.
+    destruct last_nd.
+    admit.
+    admit.
   }
-  (* Case 3: head of path repeats somewhere *)
+  (* Case 3: head of path might not repeat somewhere *)
   { assert (H3 : length tl < n).
     { rewrite LibList.length_cons in H1. math. }
     assert (H4 : is_path tl). {
-      subst nodelist. destruct p.
+      subst ndlist. destruct p.
       simpls. destruct x. discriminate.
       injects Heqn.
       destruct~ tl.
@@ -597,7 +600,7 @@ Proof.
     specialize (IHn (exist _ _ H4)).
     simpls.
     specialize (IHn H3 H0).
-    exists* IHn. subst nodelist.
+    exists* IHn. subst ndlist.
     clear H3 H2 H1 H0 H n.
     sort. destruct p as [nl Hp].
     simpls. subst.
@@ -621,15 +624,15 @@ Admitted.
 
 Fact path_with_dupes_has_cycle :
   forall (p : path),
-    let nodelist := proj1_sig p in
-      ~ List.NoDup nodelist ->
+    let ndlist := proj1_sig p in
+      ~ List.NoDup ndlist ->
       exists p1 p2 p3 H1 H2,
         p = path_append (path_append p1 p2 H1) p3 H2 /\
         is_cyclic_path p2.
 Proof.
   intros.
-  remember (S (length nodelist)) as n.
-  assert (H1 : length nodelist < n) by math.
+  remember (S (length ndlist)) as n.
+  assert (H1 : length ndlist < n) by math.
   apply (path_with_dupes_helper p H1 H).
 Qed.
  
