@@ -304,6 +304,12 @@ Module ListFacts.
     math.
   Qed.
 
+  Lemma app_datatypes_app {A} (l1 l2:list A) :
+    app l1 l2 = Datatypes.app l1 l2.
+  Proof.
+    induction l1. auto.
+    simpl. now rewrite <- IHl1.
+  Qed.
   
 End ListFacts.
 Export ListFacts.

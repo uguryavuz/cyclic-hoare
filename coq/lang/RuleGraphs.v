@@ -583,9 +583,63 @@ Proof.
   destruct H0.
   (* Case 2: head of path repeats somewhere *)
   { remember (ListFacts.last tl) as last_nd.
+    apply not_not_inv in H0.
     destruct last_nd.
-    admit.
-    admit.
+    + clear H2 H1 H IHn n.
+      apply List.in_split in H0.
+      destruct H0 as [l1 [l2 H3]].
+      exists (single_path hd).
+      destruct p as [p_list Hp] eqn:Hpdef.
+      rewrite <- Hpdef.
+      simpls.
+      subst ndlist.
+      clear Heqlast_nd r.
+      rewrite H3 in Heqn.
+      clear H3.
+      rewrite <- app_datatypes_app in Heqn.
+      assert (H0 : is_path (hd :: l2)). {
+        rewrite <- app_cons_l in Heqn.
+        pose proof path_decomposing.
+        specialize (H (hd :: l1) (hd :: l2)).
+        dup_hyp Hp.
+        rewrite Heqn in Hp0.
+        specialize (H Hp0).
+        now destruct H.
+      }
+      assert (H1 : is_path (hd :: l1 & hd)). {
+        rewrite <- app_last_l in Heqn.
+        pose proof path_decomposing.
+        specialize (H (hd :: l1 & hd) l2).
+        dup_hyp Hp.
+        rewrite Heqn in Hp0.
+        specialize (H Hp0).
+        now destruct H.
+      }
+      exists (exist _ _ H1) (exist _ _ H0).
+      exists.
+      destruct p.
+      splits~.
+      apply exist_eq_exist.
+      simpls.
+      apply eq_sig_fst in Hpdef.
+      clear H0 H1.
+      rewrite Hpdef.
+      auto.
+      rewrite app_cons_l.
+      rewrite app_nil_l.
+      now rewrite <- app_last_l in Heqn.
+      unfold is_cyclic_path.
+      admit.
+    + destruct H2. 
+      assert (H2 : tl = []). {
+        destruct tl.
+        auto.
+        pose proof ListFacts.last_exists.
+        specialize (H2 rg_node tl r).
+        now contradict H2.
+      }
+      subst tl.
+      contradict H0.
   }
   (* Case 3: head of path might not repeat somewhere *)
   { assert (H3 : length tl < n).
