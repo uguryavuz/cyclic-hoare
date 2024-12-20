@@ -530,6 +530,18 @@ Proof.
   intros. now apply nodelist_pigeon.
 Qed.
 
+Lemma cycle_not_empty p :
+  is_cyclic_path p ->
+  exists nd1 nd2 p',
+  proj1_sig p = nd1::nd2::p'.
+Proof.
+  intros. destruct H.
+  destruct H0. destruct p. simpls.
+  destruct x. rewrite length_nil in H1. math.
+  destruct x. rewrite length_cons, length_nil in H1. math.
+  exists r r0 x. auto.
+Qed.
+
 Fact path_with_dupes_helper : 
   forall (n : nat) (p : path),
     let ndlist := proj1_sig p in
@@ -544,7 +556,7 @@ Proof.
   assert (H1 : length ndlist <= n) by math.
   apply le_case_eq_lt in H1.
   destruct H1. 2 : now specialize (IHn p H1 H0).
-  destruct (classic (is_cyclic_path p)). 
+  destruct (classic (is_cyclic_path p)).
   (* Case 1: entire path is simple cycle *)
   { remember (ListFacts.first ndlist) as first_nd.
     remember (ListFacts.last ndlist) as last_nd.
@@ -567,7 +579,26 @@ Proof.
       apply ListFacts.last_exists.
     }
     exists (single_path r) p (single_path r0).
-    exists. split~.
+    assert (last (proj1_sig (single_path r)) = first (proj1_sig p)).
+    { subst. subst ndlist. simpls. auto. }
+    assert (last (proj1_sig (path_append (single_path r) p H3)) =
+        first (proj1_sig (single_path r0))).
+    { simpls. rewrite last_append.
+      2: {
+        destruct p. simpls. destruct x. simpls. discriminate.
+        simpls. destruct H2. simpls.
+        destruct H4. intro. subst.
+        contradict H5. rewrite length_cons.
+        rewrite length_nil. math.
+      }
+      destruct p. simpls. destruct x. simpls. discriminate.
+      subst ndlist. simpl.
+      rewrite Heqlast_nd. simpls.
+      destruct x. simpls. contradict H0.
+      apply List.NoDup_cons. auto.
+      apply List.NoDup_nil. auto.
+    }
+    exists H3 H4. split~.
     unfold path_append. simpls.
     subst ndlist. destruct p.
     simpls. apply exist_eq_exist.
@@ -585,62 +616,112 @@ Proof.
   { remember (ListFacts.last tl) as last_nd.
     apply not_not_inv in H0.
     destruct last_nd.
-    + clear H2 H1 H IHn n.
-      apply List.in_split in H0.
-      destruct H0 as [l1 [l2 H3]].
-      exists (single_path hd).
-      destruct p as [p_list Hp] eqn:Hpdef.
-      rewrite <- Hpdef.
-      simpls.
-      subst ndlist.
-      clear Heqlast_nd r.
-      rewrite H3 in Heqn.
-      clear H3.
-      rewrite <- app_datatypes_app in Heqn.
-      assert (H0 : is_path (hd :: l2)). {
-        rewrite <- app_cons_l in Heqn.
-        pose proof path_decomposing.
-        specialize (H (hd :: l1) (hd :: l2)).
-        dup_hyp Hp.
-        rewrite Heqn in Hp0.
-        specialize (H Hp0).
-        now destruct H.
+    2: {
+      destruct tl. easy.
+      contradict Heqlast_nd.
+      symmetry. apply last_exists.
+    }
+    symmetry in Heqlast_nd.
+    apply last_app in Heqlast_nd as (l'&?).
+    subst tl.
+    remember (hd::l') as ndlst'.
+    assert (is_path ndlst').
+    { subst. subst ndlist.
+      destruct p. simpl in Heqn. subst x.
+      dup_hyp i. rewrite <- app_cons_l in i0.
+      now apply path_decomposing in i0.
+    }
+    specializes IHn (exist _ _ H3). simpls.
+    specializes IHn.
+    { subst ndlst'.
+      rewrite <- app_cons_l, length_app in H1.
+      repeat rewrite length_cons in *. math. }
+    { subst ndlist. subst. either (hd = r).
+      - subst. contra H2. unfolds. splits.
+        + unfolds. rewrite Heqn.
+          rewrite <- app_cons_l, last_app'.
+          rewrite app_cons_l. simpls~.
+        + rewrite Heqn. simpl. clear -H2.
+          apply List.NoDup_rev in H2.
+          simpl in H2. apply List.NoDup_remove in H2 as (?&?).
+          rewrite List.app_nil_r in *.
+          rewrite <- List.rev_involutive.
+          apply List.NoDup_rev.
+          replace (List.rev _) with (r :: List.rev l').
+          2: {
+            rewrite <- List.rev_unit.
+            f_equal. now rewrite app_datatypes_app.
+          }
+          apply~ List.NoDup_cons.
+        + rewrite Heqn. rewrite length_cons.
+          rewrite length_app, length_cons. math.
+      - intro. apply List.NoDup_cons_iff in H4 as (?&?).
+        contradict H4. rewrite app_datatypes_app in H0.
+        apply List.in_app_or in H0. destruct~ H0.
+        contradict H0. apply List.not_in_cons.
+        splits~.
+    }
+    exists* IHn. sort. subst. subst ndlist.
+    assert (is_path (proj1_sig p3 & r)).
+    { destruct p as (p&Hp). simpls. subst p.
+      apply eq_sig_fst in IHn. dup_hyp Hp.
+      rewrite <- app_cons_l, IHn in Hp0. simpls.
+      destruct p1 as (p1&?), p2 as (p2&?), p3 as (p3&?).
+      simpls. sort. clear H H2 H0 H3 H4 Hp.
+      apply cycle_not_empty in IHn0.
+      exists* IHn0. simpls.
+      assert (exists r, last (p1 ++ List.tl p2) = Some r). {
+        rewrite last_append.
+        2: { subst. simpls. discriminate. }
+        rewrite IHn0. simpl List.tl.
+        pose proof last_exists p' nd2.
+        now apply none_not_some in H.
       }
-      assert (H1 : is_path (hd :: l1 & hd)). {
-        rewrite <- app_last_l in Heqn.
-        pose proof path_decomposing.
-        specialize (H (hd :: l1 & hd) l2).
-        dup_hyp Hp.
-        rewrite Heqn in Hp0.
-        specialize (H Hp0).
-        now destruct H.
-      }
-      exists (exist _ _ H1) (exist _ _ H0).
-      exists.
-      destruct p.
-      splits~.
-      apply exist_eq_exist.
-      simpls.
-      apply eq_sig_fst in Hpdef.
-      clear H0 H1.
-      rewrite Hpdef.
-      auto.
-      rewrite app_cons_l.
-      rewrite app_nil_l.
-      now rewrite <- app_last_l in Heqn.
-      unfold is_cyclic_path.
-      admit.
-    + destruct H2. 
-      assert (H2 : tl = []). {
-        destruct tl.
-        auto.
-        pose proof ListFacts.last_exists.
-        specialize (H2 rg_node tl r).
-        now contradict H2.
-      }
-      subst tl.
-      contradict H0.
-  }
+      exists* H. sort.
+      apply last_app in H as ?.
+      exists* H0. sort. rewrite H0 in Hp0.
+      rewrite H in H5. destruct p3.
+      { simpls. discriminate. }
+      simpl in H5. injects H5.
+      simpl in Hp0. do 2 rewrite app_assoc in Hp0.
+      apply path_decomposing in Hp0 as (?&?).
+      rewrite app_cons_one_r in H2. auto.
+    }
+    destruct p as (p&Hp).
+    simpl in Heqn. subst.
+    assert (last (proj1_sig p1 ++ List.tl (proj1_sig p2)) =
+        first (proj1_sig (exist is_path (proj1_sig p3 & r) H1))). 
+    { rewrite H5. simpl.
+      destruct p3. simpl. destruct x. simpls.
+      { apply cycle_not_empty in IHn0.
+        exists* IHn0. destruct p2. subst. simpls.
+        subst. simpls. clear IHn.
+        rewrite last_append in H5.
+        contradict H5. apply last_exists.
+        discriminate. }
+      rewrite app_cons_l. auto.
+    }
+    exists p1 p2 (exist _ _ H1) H4 H6.
+    splits~.
+    apply exist_eq_exist. simpls.
+    apply eq_sig_fst in IHn.
+    rewrite <- app_cons_l, IHn.
+    simpls.
+    destruct p1 as (p1&?), p2 as (p2&?), p3 as (p3&?).
+    simpls. sort.
+    rewrite app_assoc.
+    f_equal. destruct p3.
+    { simpls. contradict H5.
+      assert (List.tl p2 <> []).
+      { apply cycle_not_empty in IHn0.
+        exists* IHn0. simpls. subst.
+        discriminate. }
+      rewrite~ last_append.
+      { destruct p2. contradiction.
+        simpls. destruct p2. contradiction.
+        apply last_exists. } }
+    simpls. clear.
+    rewrite app_cons_l. simpls. auto. }
   (* Case 3: head of path might not repeat somewhere *)
   { assert (H3 : length tl < n).
     { rewrite LibList.length_cons in H1. math. }
@@ -667,14 +748,29 @@ Proof.
       now apply path_decomposing in H.
     }
     exists (exist _ _ G) p2 p3.
-    exists. splits~.
+    assert (last (proj1_sig (exist is_path (hd :: proj1_sig p1) G)) =
+          first (proj1_sig p2)).
+    { simpl proj1_sig. destruct p1.
+      destruct x. simpls.
+      { apply cycle_not_empty in IHn0. exists* IHn0.
+        clear IHn. rewrite IHn0 in H5.
+        simpls. discriminate. }
+      simpls. auto. }
+    assert (last (proj1_sig (exist is_path (hd :: proj1_sig p1) G) 
+          ++ List.tl (proj1_sig p2)) = first (proj1_sig p3)).
+    { simpl. apply cycle_not_empty in IHn0.
+      exists* IHn0. destruct p2. simpls. subst.
+      simpls. clear IHn. rewrite last_append in H6.
+      rewrite~ last_append. discriminate.
+      discriminate. }
+    exists H H0. splits~.
     apply exist_eq_exist. simpls.
     clear G IHn0 Hp.
     rewrite 2!app_cons_l.
     f_equal. injects~ IHn.
   }
+Qed.
 
-Admitted.
 
 Fact path_with_dupes_has_cycle :
   forall (p : path),
