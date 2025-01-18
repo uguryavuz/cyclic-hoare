@@ -278,6 +278,30 @@ Module ListFacts.
   Definition get_nonempty_last (l : list A) (H : l <> []) : A :=
     proj1_sig (constructive_definite_description _ (nonempty_last H)).
 
+  Lemma last_app l x :
+    last l = Some x ->
+    exists l',
+    l = l' & x.
+  Proof.
+    induction l.
+    { intros. discriminate. }
+    intros. simpls.
+    destruct l. injects H.
+    exists (@nil A).
+    rewrite~ last_nil.
+    apply IHl in H. exists* H.
+    exists (a :: l').
+    now rewrite last_cons, H.
+  Qed.
+
+  Lemma last_app' l x :
+    last (l & x) = Some x.
+  Proof.
+    rewrite last_append.
+    simpls~. discriminate.
+  Qed.
+
+
   End FirstLast.
 
 
