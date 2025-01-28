@@ -935,14 +935,14 @@ Definition depth_opt (nd : rg_node) : nat? :=
   @depth_aux (cardinal rg.(rg_nodes)) nd.
 
 Lemma depth_exists (nd:rg_node) :
-  exists! (n : nat),
+  exists (n : nat),
   depth_opt nd = Some n.
 Proof.
 
 Admitted.
 
 Definition depth (nd:rg_node) :=
-  proj1_sig (constructive_definite_description _ (depth_exists nd)).
+  proj1_sig (constructive_indefinite_description _ (depth_exists nd)).
 
 Notation is_prem prem nd := (List.In prem (rg_prems nd)).
 
@@ -953,7 +953,7 @@ Notation is_prem prem nd := (List.In prem (rg_prems nd)).
   : depth' nd (S d)
 .*)
 
-Fixpoint depth' (fuel:nat) (nd : rg_node) : nat :=
+(*Fixpoint depth' (fuel:nat) (nd : rg_node) : nat :=
   match fuel with
   | O => 0
   | S fuel =>
@@ -967,12 +967,12 @@ Lemma depth_eq nd :
   depth nd = depth' (cardinal rg.(rg_nodes)) nd.
 Proof.
   unfold depth, depth'.
-  destruct constructive_definite_description as (d&Hd).
+  destruct constructive_indefinite_description as (d&Hd).
   simpls. destruct (cardinal _) eqn:E.
   { unfold depth_opt in Hd. rewrite E in Hd. discriminate. }
   sort.
   unfold depth_opt, depth_aux in Hd.
-Admitted.
+Admitted.*)
 
 
 Lemma depth_mono (nd:rg_node) :
@@ -980,7 +980,7 @@ Lemma depth_mono (nd:rg_node) :
   is_prem prem nd ->
   (depth prem < depth nd)%nat.
 Proof.
-  intros. repeat rewrite depth_eq.
+  (*intros. repeat rewrite depth_eq.
   destruct (cardinal (rg_nodes rg)) eqn:E.
   { destruct nd. apply NodeSetProperties.cardinal_inv_1 in E.
     now specializes E x. }
@@ -989,10 +989,10 @@ Proof.
   apply list_max_min, List.in_map_iff.
   exists prem. splits~.
   assert (depth' (S n) prem = depth' n prem).
-  2: { now rewrite H0 in Heqdp. }
+  2: { now rewrite H0 in Heqdp. }*)
 Admitted.
 
-Lemma depth_O nd :
+(*Lemma depth_O nd :
   depth nd <> O.
 Proof.
   intro. rewrite depth_eq in H.
@@ -1000,7 +1000,7 @@ Proof.
   exists* H0. rewrite H0 in H.
   simpls. discriminate.
 Qed.
-
+*)
 (*Lemma depth_1 nd :
   depth nd = 1%nat ->
   rg_prems nd = [].
@@ -1108,6 +1108,9 @@ Proof.
   rewrite <- H2.
   apply~ acyclic_soundness.
 Qed.
+
+
+Print Assumptions sound_from_acyclic_graph.
 
 
 
