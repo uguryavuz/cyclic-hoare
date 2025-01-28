@@ -124,8 +124,8 @@ Variable valid_rule : rule -> list stmt -> stmt -> Prop.
 Definition sound_rule (r : rule) : Prop :=
   forall (prems : list stmt) (conc : stmt),
     valid_rule r prems conc ->
-      LibList.Forall valid_stmt prems ->
-      valid_stmt conc.  
+      List.Forall valid_stmt prems ->
+      valid_stmt conc.
 
 Variant rule_or_lift : Type :=
   | Rule (r : rule) 
@@ -149,6 +149,11 @@ Section RuleGraph.
 Variable rg : rule_graph.
 
 Notation rg_node := rg.(rg_node).
+
+Definition rules_in_graph_sound :=
+  forall rule, 
+  (exists nd, @rg_rule rg nd = Rule rule) -> 
+  sound_rule rule.
 
 Definition valid_rule_graph : Prop :=
   forall (nd : rg_node), 
@@ -880,18 +885,237 @@ Definition longest_path (H : ~ is_cyclic_rule_graph) : path :=
 
 End Cycles.
 
+
+(*Lemma empty_not_cyclic :
+  is_cyclic_rule_graph ->
+  cardinal rg.(rg_nodes) <> O.
+Proof.
+  intro. unfolds is_cyclic_rule_graph.
+  exists* H. unfolds in H.
+  exists* H. intro.
+  Search cardinal.*)
+
+
+Lemma cardinal_nonempty :
+  forall (nd : rg_node),
+  exists n,
+  cardinal (rg_nodes rg) = S n.
+Proof.
+  intros. destruct nd.
+  apply Nat.neq_0_r.
+  intro. apply NodeSetProperties.cardinal_inv_1 in H.
+  now specializes H i.
+Qed.
+
+
 Section Depth.
 
 Variable A : ~ is_cyclic_rule_graph.
 
-(*Definition max_option (a b : nat?) : nat? :=
+Definition max_option (a b : nat?) : nat? :=
   match a, b with
   | Some n1, Some n2 => Some (Nat.max n1 n2)
   | _, _ => None
   end.
 
 Definition depth_fold (l : list nat?) : nat? :=
-  List.fold_left max_option l (Some O).*)
+  List.fold_left max_option l (Some O).
+
+Fixpoint depth_aux (fuel : nat) (nd : rg_node) : nat? :=
+  match fuel with 
+  | O => None
+  | S fuel =>
+    let depths := 
+      List.map (@depth_aux fuel)
+      (rg_prems nd) in
+    option_map S (depth_fold depths)
+  end.
+
+Definition depth_opt (nd : rg_node) : nat? :=
+  @depth_aux (cardinal rg.(rg_nodes)) nd.
+
+Lemma depth_exists (nd:rg_node) :
+  exists! (n : nat),
+  depth_opt nd = Some n.
+Proof.
+
+Admitted.
+
+Definition depth (nd:rg_node) :=
+  proj1_sig (constructive_definite_description _ (depth_exists nd)).
+
+Notation is_prem prem nd := (List.In prem (rg_prems nd)).
+
+(*Inductive depth' (nd:rg_node) : nat -> Prop :=
+| DepthO (HP : rg_prems nd = []) : depth' nd O
+| DepthS d (HE : exists prem, is_prem prem nd /\ depth' prem d) 
+         (HU : forall prem d', is_prem prem nd -> depth' prem d' -> d' <= d) 
+  : depth' nd (S d)
+.*)
+
+Fixpoint depth' (fuel:nat) (nd : rg_node) : nat :=
+  match fuel with
+  | O => 0
+  | S fuel =>
+    let depths := 
+      List.map (@depth' fuel)
+      (rg_prems nd) in
+    S (List.list_max depths)
+  end.
+
+Lemma depth_eq nd :
+  depth nd = depth' (cardinal rg.(rg_nodes)) nd.
+Proof.
+  unfold depth, depth'.
+  destruct constructive_definite_description as (d&Hd).
+  simpls. destruct (cardinal _) eqn:E.
+  { unfold depth_opt in Hd. rewrite E in Hd. discriminate. }
+  sort.
+  unfold depth_opt, depth_aux in Hd.
+Admitted.
+
+
+Lemma depth_mono (nd:rg_node) :
+  forall (prem:rg_node),
+  is_prem prem nd ->
+  (depth prem < depth nd)%nat.
+Proof.
+  intros. repeat rewrite depth_eq.
+  destruct (cardinal (rg_nodes rg)) eqn:E.
+  { destruct nd. apply NodeSetProperties.cardinal_inv_1 in E.
+    now specializes E x. }
+  remember (depth' _ prem) as dp.
+  unfold depth'. apply Nat.lt_succ_r.
+  apply list_max_min, List.in_map_iff.
+  exists prem. splits~.
+  assert (depth' (S n) prem = depth' n prem).
+  2: { now rewrite H0 in Heqdp. }
+Admitted.
+
+Lemma depth_O nd :
+  depth nd <> O.
+Proof.
+  intro. rewrite depth_eq in H.
+  pose proof cardinal_nonempty nd.
+  exists* H0. rewrite H0 in H.
+  simpls. discriminate.
+Qed.
+
+(*Lemma depth_1 nd :
+  depth nd = 1%nat ->
+  rg_prems nd = [].
+Proof.
+  intros. rewrite depth_eq in H.
+  pose proof cardinal_nonempty nd.
+  exists* H0. rewrite H0 in H.
+  simpls. injection H as H.
+  assert (List.list_max (List.map (depth' n) (rg_prems nd)) <= 0)%nat by math.
+  rewrite List.list_max_le in H1.
+  rewrite List.Forall_forall in H1.
+  destruct (rg_prems nd) eqn:E. auto.
+  simpls. specializes H1. left. reflexivity.
+  apply Nat.le_0_r in H1.
+  contradict H1.
+Admitted.
+  *)
+
+Lemma depth_induction_aux (P : [rg_node]) :
+  forall n,
+  (forall nd, List.Forall P (rg_prems nd) -> P nd) ->
+  (*(forall nd, (depth nd < n)%nat -> P nd) ->*)
+  forall nd,
+  (depth nd < n)%nat ->
+  P nd.
+Proof.
+  induction n.
+  { intros. math. }
+  intros. apply H, List.Forall_forall.
+  intros prem HP. sort.
+  apply~ IHn.
+  pose proof @depth_mono nd prem HP.
+  math.
+Qed.
+
+
+(*Lemma depth_induction_aux (P : [rg_node]) n :
+  (forall nd, List.Forall P (rg_prems nd) -> P nd) ->
+  (forall nd, (depth nd < n)%nat -> P nd) ->
+  forall nd,
+  depth nd <= n ->
+  P nd.
+Proof.
+  intros. apply H. apply List.Forall_forall.
+  intros prem HP. sort.
+  apply H0. pose proof depth_mono _ _ HP.
+  repeat rewrite depth_eq in *.
+  pose proof cardinal_nonempty nd.
+  exists* H3. rewrite H3 in *.
+  applys~ Nat.lt_le_trans H2.
+Qed.*)
+
+Theorem depth_induction (P : [rg_node]) :
+  (forall nd, List.Forall P (rg_prems nd) -> P nd) ->
+  forall nd, P nd.
+Proof.
+  intros.
+  pose proof @depth_induction_aux P (depth nd) H.
+  apply H, List.Forall_forall.
+  intros prem HP. sort.
+  apply~ H0. apply~ depth_mono.
+Qed.
+
+Corollary acyclic_soundness :
+  valid_rule_graph ->
+  rules_in_graph_sound ->
+  forall nd, valid_stmt (@rg_conc rg nd).
+Proof.
+  intros.
+  pose proof @depth_induction (fun nd => valid_stmt (@rg_conc rg nd)).
+  specialize H1 with (nd:=nd).
+  specializes~ H1. clear nd.
+  intros.
+  unfold sound_rule in H0.
+  destruct (rg_rule nd) eqn:E.
+  2: { specializes H nd. now rewrite E in H. }
+  specializes H0 r (List.map (@rg_conc rg) (@rg_prems rg nd)).
+  pose proof (@rg_wf rg).
+  apply H0.
+  + specializes H2 nd. now rewrite E in H2.
+  + now apply List.Forall_map.
+Qed.
+
+End Depth.
+
+End RuleGraph.
+
+(* A statement is valid if 
+   a graph exists where 
+   1. all lifted statements in the graph are valid
+   2. all rules used in the graph are locally sound
+   3. the statement exists somewhere in the graph
+*)
+Theorem sound_from_acyclic_graph :
+  forall (s:stmt),
+  (exists (rg:rule_graph),
+    valid_rule_graph rg /\ 
+    ~ is_cyclic_rule_graph rg /\
+    rules_in_graph_sound rg /\
+    exists nd, @rg_conc rg nd = s
+  ) ->
+  valid_stmt s.
+Proof.
+  intros. exists* H.
+  rewrite <- H2.
+  apply~ acyclic_soundness.
+Qed.
+
+
+
+
+Section DeepestNodelist.
+
+Variable rg : rule_graph.
+Notation rg_node := rg.(rg_node).
 
 Definition folder (f : rg_node -> (list rg_node)?) acc prem := 
   match acc with
@@ -1100,39 +1324,8 @@ Proof.
 
 
 
-Fixpoint depth_aux (fuel : nat) (nd : rg_node) : nat? :=
-  match fuel with 
-  | O => None
-  | S fuel =>
-    let depths := 
-      LibList.map (@depth_aux fuel)
-      (rg_prems nd) in
-    option_map S (depth_fold depths)
-  end.
-
-Definition depth (nd : rg_node) : nat? :=
-  @depth_aux (cardinal rg.(rg_nodes)) nd.
-
-Lemma depth_exists : 
-  forall (nd : rg_node),
-    exists (n : nat),
-      depth nd = Some n.
-Proof.
-  
-(* Definition depth (nd : rg_node) : nat? :=
-  @depth_aux (length (proj1_sig (longest_path A))) nd.
-
-Lemma depth_exists : 
-  forall (nd : rg_node),
-    exists (n : nat),
-      depth nd = Some n.
-Proof.
-  pose proof (acyclic_implies_longest_path A).
-  contra H.
-  rewrite not_forall_eq in H.
-  destruct H as [nd H]. *)
 
 
-End Depth.
+End DeepestNodelist.
 
 End RuleGraph.

@@ -334,6 +334,20 @@ Module ListFacts.
     induction l1. auto.
     simpl. now rewrite <- IHl1.
   Qed.
+
+  Lemma list_max_min (l:list nat) (n:nat) :
+    List.In n l ->
+    (n <= List.list_max l)%nat.
+  Proof.
+    intros.
+    pose proof @List.list_max_lt l n.
+    destruct l. { contradiction. }
+    specializes H0. discriminate.
+    apply Nat.nlt_ge. intro. apply H0 in H1 as ?.
+    clear H0. rewrite List.Forall_forall in H2.
+    apply H2 in H. math.
+  Qed.
+
   
 End ListFacts.
 Export ListFacts.
