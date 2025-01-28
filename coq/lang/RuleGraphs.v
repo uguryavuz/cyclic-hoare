@@ -268,6 +268,7 @@ Definition reaches (nd1 nd2 : rg_node) : Prop :=
       ListFacts.last nodelist = Some nd2.
 
 Lemma reaches_refl : forall nd, reaches nd nd.
+Proof.
   intros.
   unfold reaches.
   assert (H : is_path ([nd]%list)) by (now unfold is_path).
@@ -275,6 +276,30 @@ Lemma reaches_refl : forall nd, reaches nd nd.
   assert (H_NE : [nd]%list <> []) by discriminate.
   split; auto.
 Qed.
+
+Lemma reaches_trans nd1 nd2 nd3 :
+  reaches nd1 nd2 ->
+  reaches nd2 nd3 ->
+  reaches nd1 nd3.
+Proof.
+  intros.
+  unfolds reaches. exists* H, H0.
+  rewrite <- H0 in H1.
+  exists (path_append _ _ H1).
+  destruct p, p0. simpls. splits.
+  - rewrite~ first_append. intro.
+    subst. discriminate.
+  - destruct x0. discriminate.
+    simpl in H0. injects H0.
+    destruct x0.
+    + simpls. rewrite app_nil_r.
+      now transitivity (Some nd2).
+    + simpl. rewrite last_append. 2: discriminate.
+      rewrite <- H2.
+      remember (r::x0) as l.
+      simpl. rewrite~ Heql.
+Qed.
+
 
 End Reaches.
 
