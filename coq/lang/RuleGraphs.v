@@ -945,6 +945,20 @@ Proof.
       applys IHl H.
 Qed.
 
+Lemma depth_fold_none_in_list (l : list nat?) : 
+  forall (acc : nat),
+    (fold_left max_option (Some acc) l) = None ->
+    List.In None l.
+Proof.
+  induction l. discriminate.
+  destruct a. 2 : now constructor. 
+  intros.
+  apply List.in_cons.
+  rewrite fold_left_cons in H.
+  simpls.
+  applys IHl H.
+Qed.
+
 Lemma depth_bound (l : list nat?) :
   forall (n : nat) (acc : nat),
     (fold_left max_option (Some acc) l) = Some n ->
@@ -1022,15 +1036,82 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma none_depth_cases :
+  forall (nd : rg_node) (fuel : nat),
+    depth_aux fuel nd = None ->
+    fuel = O \/ 
+      exists (prem : rg_node),
+        is_prem prem nd /\ depth_aux (pred fuel) prem = None.
+Proof.
+  intros.
+  unfold depth_aux in H.
+  destruct fuel. left. math. right.
+  destruct depth_fold eqn:Heq. discriminate.
+  clear H.
+  unfold depth_fold in Heq.
+  pose proof depth_fold_none_in_list.
+  specializes H Heq.
+  rewrite List.in_map_iff in H.
+  destruct H as [prem [H1 H2]].
+  exists prem.
+  auto.
+Qed.
+
+Lemma none_depth_to_path_of_length : 
+  forall (fuel : nat) (nd : rg_node),
+    depth_aux fuel nd = None ->
+    exists (p : path),
+      first (proj1_sig p) = Some nd /\ length (proj1_sig p) = S fuel.
+Proof.
+  induction fuel.
+  - intros nd _.
+    exists (single_path nd).
+    destruct single_path eqn:Heq.
+    unfold single_path in Heq.
+    simpls.
+    injects Heq. 
+    auto.
+  - intros. 
+    apply none_depth_cases in H as [H1 | H2]. discriminate.
+    exists* H2.
+    simpls.
+    specializes IHfuel H0.
+    destruct IHfuel as [[p P] [? ?]].
+    simpls.
+    assert (is_path (nd :: p)). 2 : { 
+      exists (exist _ _ H3). 
+      simpls. split. auto.
+      rewrite length_cons. math.
+    }
+    simpl.
+    destruct p. discriminate. split~.
+    simpls. injects H. auto.
+Qed.
+
 Definition depth_opt (nd : rg_node) : nat? :=
   @depth_aux (cardinal rg.(rg_nodes)) nd.
 
-Lemma depth_exists (nd:rg_node) :
-  exists (n : nat),
-  depth_opt nd = Some n.
+Lemma depth_exists :
+  forall (nd : rg_node),
+    exists (n : nat),
+      depth_opt nd = Some n.
 Proof.
-
-Admitted.
+  pose proof none_depth_to_path_of_length.
+  intros.
+  apply none_not_some.
+  intro.
+  specializes H H0.
+  exists* H.
+  contradict A.
+  pose proof path_longer_than_card_has_dupes.
+  specializes H2 p.
+  simpls.
+  specializes H2. math.
+  pose proof path_with_dupes_has_cycle.
+  specializes H3 H2.
+  exists* H3.
+  now exists p2.
+Qed.
 
 Definition depth (nd:rg_node) :=
   proj1_sig (constructive_indefinite_description _ (depth_exists nd)).
