@@ -904,6 +904,8 @@ Section Depth.
 
 Variable A : ~ is_cyclic_rule_graph.
 
+Notation is_prem prem nd := (List.In prem (rg_prems nd)).
+
 Definition max_option (a b : nat?) : nat? :=
   match a, b with
   | Some n1, Some n2 => Some (Nat.max n1 n2)
@@ -911,7 +913,62 @@ Definition max_option (a b : nat?) : nat? :=
   end.
 
 Definition depth_fold (l : list nat?) : nat? :=
-  List.fold_left max_option l (Some O).
+  LibList.fold_left max_option (Some O) l.
+
+Lemma depth_fold_none (l : list nat?) :
+  fold_left max_option None l = None.
+Proof.
+  induction l.
+  - intros. apply fold_left_nil.
+  - rewrite fold_left_cons.
+    destruct a; now simpls.
+Qed.   
+
+Lemma depth_fold_some (l : list nat?) :
+  forall (n : nat) (acc : nat), 
+    (fold_left max_option (Some acc) l) = Some n ->
+    List.Forall (<> None) l.
+Proof.
+  induction l.
+  - intros. apply List.Forall_nil.
+  - intros.
+    constructor.
+    + unfold depth_fold in H.
+      rewrite fold_left_cons in H.
+      contra H.
+      subst. 
+      simpls.
+      rewrite depth_fold_none.
+      discriminate.
+    + rewrite fold_left_cons in H.
+      destruct a; simpls. 2 : now rewrite depth_fold_none in H.
+      applys IHl H.
+Qed.
+
+Lemma depth_bound (l : list nat?) :
+  forall (n : nat) (acc : nat),
+    (fold_left max_option (Some acc) l) = Some n ->
+    acc <= n /\ List.Forall 
+      (fun m_opt => 
+        match m_opt with 
+        | None   => False
+        | Some m => m <= n
+        end) l.
+Proof.
+  induction l.
+  - intros.
+    split. 2: constructor.
+    rewrite fold_left_nil in H.
+    injects H. math.
+  - intros.
+    rewrite fold_left_cons in H.
+    destruct a. 
+    2 : simpls; now rewrite depth_fold_none in H.
+    simpls.
+    apply IHl in H as [H1 H2].
+    split. math.
+    constructor; [math | auto].
+Qed.
 
 Fixpoint depth_aux (fuel : nat) (nd : rg_node) : nat? :=
   match fuel with 
@@ -922,6 +979,48 @@ Fixpoint depth_aux (fuel : nat) (nd : rg_node) : nat? :=
       (rg_prems nd) in
     option_map S (depth_fold depths)
   end.
+
+Lemma depth_aux_decr_fuel (fuel : nat) (nd prem : rg_node) :
+  is_prem prem nd ->
+  depth_aux (S fuel) nd <> None ->
+  depth_aux fuel prem <> None.
+Proof.
+  intros.
+  unfold depth_aux in H0.
+  apply none_not_some in H0 as [d H1].
+  unfold option_map in H1.
+  destruct depth_fold eqn:Heq. 2 : discriminate.
+  injects H1.
+  apply depth_fold_some in Heq.
+  rewrite List.Forall_map, List.Forall_forall in Heq.
+  specializes Heq H.
+  auto.
+Qed.
+
+Lemma depth_aux_incr_fuel (fuel : nat) :
+  forall (nd : rg_node) (d : nat),
+    depth_aux fuel nd = Some d ->
+    depth_aux (S fuel) nd = Some d.
+Proof.
+  induction fuel; intros. 
+  now unfold depth_aux in H.
+  rewrite <- H.
+  unfold depth_aux.
+  f_equal.
+  f_equal.
+  apply List.map_ext_in_iff.
+  intros.
+  fold (depth_aux fuel a).
+  fold (depth_aux (S fuel) a).
+  pose proof depth_aux_decr_fuel.
+  specializes H1 fuel H0.
+  specializes H1. now rewrite H.
+  apply none_not_some in H1 as [? ?].
+  specializes IHfuel H1.
+  rewrite IHfuel.
+  rewrite <- H1.
+  reflexivity.
+Qed.
 
 Definition depth_opt (nd : rg_node) : nat? :=
   @depth_aux (cardinal rg.(rg_nodes)) nd.
@@ -936,17 +1035,44 @@ Admitted.
 Definition depth (nd:rg_node) :=
   proj1_sig (constructive_indefinite_description _ (depth_exists nd)).
 
-Notation is_prem prem nd := (List.In prem (rg_prems nd)).
-
-
 Lemma depth_mono (nd:rg_node) :
   forall (prem:rg_node),
   is_prem prem nd ->
   (depth prem < depth nd)%nat.
 Proof.
-
-Admitted.
-
+  intros.
+  unfold depth.
+  destruct constructive_indefinite_description as [d_prem Heq_dprem].
+  destruct constructive_indefinite_description as [d Heq_d].
+  simpls.
+  unfold depth_opt in *.
+  pose proof cardinal_nonempty nd as [n].
+  pose proof Heq_d.
+  rewrite H0 in Heq_d.
+  simpls.
+  unfold option_map in Heq_d.
+  destruct depth_fold eqn:E. 2 : discriminate.
+  inverts Heq_d.
+  rename n0 into d.
+  unfold depth_fold in E.
+  pose proof E.
+  apply depth_bound in H2 as [_ H2].
+  rewrite List.Forall_forall in H2.
+  specializes H2 (Some d_prem).
+  specializes H2. 2 : math.
+  apply List.in_map_iff.
+  exists prem.
+  splits~.
+  pose proof depth_aux_decr_fuel.
+  pose proof depth_aux_incr_fuel.
+  specializes H2 n H.
+  specializes H2. rewrite H0 in H1. now rewrite H1.
+  apply none_not_some in H2 as [? ?].
+  specializes H3 H2.
+  rewrite H0 in Heq_dprem.
+  rewrite H2. rewrite <- Heq_dprem.
+  auto.
+Qed.
 
 Definition locally_sound P :=
   forall nd, List.Forall P (@rg_prems rg nd) -> P nd.
@@ -1021,12 +1147,6 @@ Proof.
   rewrite <- H2.
   apply~ acyclic_soundness.
 Qed.
-
-
-Print Assumptions sound_from_acyclic_graph.
-
-
-
 
 Section DeepestNodelist.
 
