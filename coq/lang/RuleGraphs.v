@@ -1,5 +1,5 @@
 Set Implicit Arguments.
-From Lang Require Export Util.
+From Lang Require Import Util.
 From Coq Require Import Structures.OrderedTypeEx.
 From Coq Require FSetList FSetFacts FSetProperties.
 
@@ -114,12 +114,17 @@ Definition proj_into_subdom
   exist (fun e' => In e' (remove e dom)) (proj1_sig e') 
     (@remove_2 dom e (proj1_sig e') H (proj2_sig e')).
 
-Variable stmt : Type.
-Variable liftable : stmt -> Prop.
-Variable valid_stmt : stmt -> Prop.
+Module Type RuleGraphParams.
+  Parameter stmt : Type.
+  Parameter liftable : stmt -> Prop.
+  Parameter valid_stmt : stmt -> Prop.
+  Parameter rule : Type.
+  Parameter valid_rule : rule -> list stmt -> stmt -> Prop.
+End RuleGraphParams.
 
-Variable rule : Type.
-Variable valid_rule : rule -> list stmt -> stmt -> Prop.
+Module RuleGraph(RGP : RuleGraphParams).
+
+Include RGP.
 
 Definition sound_rule (r : rule) : Prop :=
   forall (prems : list stmt) (conc : stmt),
@@ -144,7 +149,7 @@ Inductive rule_graph : Type := {
               end
 }.
 
-Section RuleGraph.
+Section RuleGraphInstance.
 
 Variable rg : rule_graph.
 
@@ -1206,7 +1211,7 @@ Qed.
 
 End Depth.
 
-End RuleGraph.
+End RuleGraphInstance.
 
 (* A statement is valid if 
    a graph exists where 
@@ -1229,3 +1234,4 @@ Proof.
   apply~ acyclic_soundness.
 Qed.
 
+End RuleGraph.
