@@ -1,0 +1,267 @@
+
+\section{Rule graphs}
+
+\newcommand*{\DomLiftable}{\mathit{Lift}}
+\newcommand*{\DomStmt}{\mathit{Stmt}}
+\newcommand*{\DomRule}{\mathit{Rule}}
+\newcommand*{\LIFT}{\textsc{Lift}}
+
+Suppose we have a family of statements $\DomStmt$,
+where for each statement $S \in \DomStmt$
+we have a defined notion of validity,
+denoted $\VAL S$.
+%
+We also have a subset of \emph{liftable} statements
+$\DomLiftable \subseteq \DomStmt$;
+these are statements for which
+we are ``comfortable'' lifting a proof of their derivability
+to a metalogical proof of their validity.
+%
+We also have a family of rules $\DomRule$ of the form
+\[
+    \inferrule*[right=Rule-Name]{
+        \DER S_1 \\ \cdots \\ \DER S_n
+    }{
+        \DER C
+    }
+\]
+%
+\begin{definition}
+    A rule with premises $S_1,\dots,S_n$ and conclusion $C$ is \emph{locally sound} if
+    \[\VAL S_1 \wedge \cdots \wedge \VAL S_n \implies \VAL C.\]
+\end{definition}
+%
+
+\newcommand*{\DomNode}{\mathit{Nodes}}
+\newcommand*{\node}{\mathit{node}}
+\newcommand*{\MapConc}{\mathit{conc}}
+\newcommand*{\MapRule}{\mathit{rule}}
+\newcommand*{\MapPrems}{\mathit{prems}}
+
+\begin{definition}
+A \emph{rule graph} is a tuple $G=(\DomNode,\MapConc,\MapRule,\MapPrems)$ for a
+finite set of node names $\DomNode$,
+and mappings %from node names to statements 
+    $\MapConc : \DomNode \ra \DomStmt$,
+%a mapping from node names to rule names 
+    $\MapRule : \DomNode \ra \DomRule + \LIFT$,
+%and a mapping from node names to premises 
+ and   $\MapPrems : \DomNode \ra \DomNode^*$,
+such that for every $\node \in \DomNode$:
+\begin{itemize}
+\item If $\MapRule(\node) = r \in \DomRule$
+    where $\abs{p} = n$, then
+    \[
+        \inferrule{
+            \DER \MapConc(\MapPrems_1(\node))
+            \\ \cdots \\
+            \DER \MapConc(\MapPrems_n(\node))
+        }{ \DER \MapConc(\node) }
+    \]
+    is a syntactically valid instance of $r$,\\
+    where $\MapPrems_i(\node)$
+    denotes $\pi_i(\MapPrems(\node))$.
+\item Otherwise, if $\MapRule(\node) = \LIFT$,
+    then $\MapPrems(\node) = []$ and 
+    $\MapConc(\node) \in \DomLiftable$.
+\end{itemize}
+\end{definition}
+
+A statement is \emph{in} a graph if $S \in \mathrm{Im}(G.\MapConc)$.
+Denote with $S \in G$.
+
+\begin{definition}
+    A \emph{path} in a rule graph $(\DomNode,\MapConc,\MapRule,\MapPrems)$
+    is a possibly infinite sequence of nodes
+    $\node_1,\node_2,\dots$
+    all in $\DomNode$
+    such that
+    $\forall i > 0.\
+    \node_{i+1} \in \MapPrems(\node_i).
+    $
+\end{definition}
+
+\newcommand*{\reaches}[3]{%
+    \ensuremath{#1 \leadsto_{#3} #2}%
+}
+For a rule graph $G$ with a node set $\DomNode$,
+and a pair of nodes $\node, \node' \in \DomNode$,
+we will let \reaches{\node}{\node'}{G} denote
+the existence of a path in $G$
+that begins with $\node$ and ends with $\node'$.
+Note how a path containing a liftable node 
+which employs the \LIFT\ rule must end at that node.
+
+\begin{definition}
+    A \emph{(simple) cycle} is a finite path $\node_1,\dots,\node_n$
+    for $n>1$,
+    where $\node_1 = \node_n$ and all other nodes are distinct.
+    %
+    A rule graph is \emph{cyclic}
+    iff it contains a path which is a cycle.
+\end{definition}
+
+
+\begin{lemma}
+    A rule graph is cyclic iff
+    it does not have a longest path.
+\end{lemma}
+\begin{proof}
+First direction:
+Consider any path in the graph.
+We can always produce a longer path by iterating over the graph's cycle a sufficient number of times.
+
+Second direction:
+If there is no longest path, then there is a path longer than the cardinality of $\DomNode$. By pigeonhole w.r.t.\ the finitude of $\DomNode$,
+this path must contain a duplicate node.
+A path containing a duplicate node must contain a cycle.
+%See Coq. (Depends on finitude of $\DomNode$)
+\end{proof}
+
+\newcommand{\restrict}[2]{%
+    #1 {\mid_{#2}} %
+}
+
+\iffalse
+\begin{definition}
+    The \emph{subgraph} of a graph $G=(\DomNode,\MapConc,\MapRule,\MapPrems)$ w.r.t.\ $\node \in \DomNode$
+    is 
+    \\
+    $G'=(
+        \DomNode',\
+        \restrict\MapConc{\DomNode'},\
+        \restrict\MapRule{\DomNode'},\
+        \restrict\MapPrems{\DomNode'}
+    )$,
+    where $\DomNode' = 
+        \SetBuild(\node' \in \DomNode | \reaches{\node}{\node'}{G})$.
+\end{definition}
+
+\begin{lemma}
+Any subgraph is well-defined according to the definition of graph.
+\end{lemma}
+\fi
+
+\subsection{Soundness of acyclic graphs}
+
+\begin{definition}
+$(\DomNode,\MapConc,\MapRule,\_)$ is \emph{lift-valid}
+if
+\(
+    \forall \node \in \DomNode.\ \MapRule(\node) = \LIFT \implies
+    \VAL \MapConc(\node).
+\)
+\end{definition}
+
+\begin{definition}
+    A graph is \emph{locally sound} if
+    all rules in the graph are locally sound.
+\end{definition}
+
+\begin{lemma}
+    \label{lem:acyclic-soundness}
+    If a graph $G$ is lift-valid, locally sound, and acyclic,
+    then $\VAL S$ for every $S \in G$.
+    %
+    %Consider a graph $G=(\DomNode,\MapConc,\MapRule,\MapPrems)$.
+    %and a node $\node \in \DomNode$.
+    %If $G$ is acyclic, lift-valid, and locally sound,
+    %and all rules in the image of $\MapRule$ are locally sound,
+    %then $\VAL \MapConc(\node)$ for every node $\node \in \DomNode$.
+\end{lemma}
+
+\begin{proof}
+We induct over the depth of nodes in the rule graph.
+The depth of a leaf is 1;
+the depth of a non-leaf is one greater than the maximum depth of all premises.
+From local soundness, we know that the validity of a conclusion
+comes from the validity of its premises. 
+We also know that the depth of a conclusion is greater than that of its premises.
+Thus by strong induction on depth,
+where the base case is every leaf
+(which is either valid by lack of premises or by being lifted),
+we find that every statement in the graph must be valid.
+
+\end{proof}
+
+Consider how depth is only well-defined for an acyclic graph.
+This means computing depth in our Coq implementation required
+proving that depth always exists as a finite value for each node in an acyclic graph.
+We implemented depth as a fixpoint with fuel, where the initial fuel is the cardinality of $\DomNode$.
+We then had to show that this amount of fuel is sufficient. We argue that if an amount of fuel $f$ is insufficient for a node $n$,
+then a path from $n$ with length $> f$ must exist.
+Thus, if $\abs\DomNode$ is insufficient fuel for a node,
+then a path longer than $\abs\DomNode$ exists,
+which is impossible in an acyclic graph.
+
+\iffalse
+\begin{lemma}
+    Consider a graph $G=(\DomNode,\MapConc,\MapRule,\MapPrems)$,
+    and a node $\node \in \DomNode$.
+    If the subgraph of $G$ w.r.t.\ $\node$ is acyclic and valid,
+    and all rules in the image of $\MapRule$ are locally sound,
+    then $\VAL \MapConc(\node)$.
+\end{lemma}
+\fi
+
+\newcommand{\DERby}[2]{\DER_{#1}{#2}}
+
+\begin{definition}
+    $S$ is \emph{derivable via graph} $G$, denoted $\DERby G S$,
+    if $S \in G$ and $G$ is lift-valid.\\
+    $S$ is \emph{derivable}, denoted $\DER S$,
+    if a graph $G$ exists s.t.\ $\DERby G S$.
+    %if a lift-valid graph $(\_, conc, \_, \_)$ exists
+    %which is lift-valid, and
+    %where $S \in \text{Im}(conc)$.
+    %contains $\node$
+    %where $\MapConc(\node) = S$.
+\end{definition}
+
+\begin{theorem}
+    For a statement $S$,
+    if $\DERby G S$ for an acyclic and locally sound graph $G$, %valid acyclic graph,
+    %for which all contained rules are locally sound,
+    then $\VAL S$.
+\end{theorem}
+
+\begin{proof}
+    Follows from Lemma~\ref{lem:acyclic-soundness}.
+\end{proof}
+
+
+\subsection{Completeness}
+
+\begin{definition}
+    Suppose we have an oracle $O$ s.t.\
+    for any $S \in \DomLiftable$,
+    $O$ accepts $S$ iff $\VAL S$.
+    A proof system is \emph{relatively complete} w.r.t.\
+    the completeness of the metalogical proofs of lifted statements
+    %$\DomLiftable$ if,
+    if, for any $S \in \DomStmt$ where $\VAL S$,
+    a locally sound $G$ exists where $S \in G$
+    and $O$ accepts every lifted statement in $G$.
+\end{definition}
+
+\subsection{Other stuff}
+
+\begin{definition}
+    A graph $(\DomNode,\MapConc,\MapRule,\MapPrems)$
+    is \emph{normal} if
+    $\MapConc$ is injective.
+\end{definition}
+
+Normalization procedure for DAG:
+\begin{enumerate}[label=(\roman*)]
+    \item Topologically sort the DAG.
+    \item If every node is unique, halt. Otherwise:
+    \item Consider node $n$ for which there are (at least) two instances.
+        Take all edges pointing into the earlier $n$ and redirect them into the latter $n$.
+    \item While nodes of indegree 0 exist, remove them.
+    \item Return to step (ii).
+\end{enumerate}
+
+\begin{conjecture}
+If 
+\end{conjecture}
