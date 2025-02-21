@@ -683,5 +683,9 @@ Definition triple m I c P Q :=
 Definition valid_triple c P Q :=
   forall m I, triple m I c P Q.
 
-Notation "'|=' c ':' P '=>' Q" := (valid_triple c P%A Q%A)
+Notation "'|=' c ':' P '=>' Q" := (valid_triple c P%A Q%A)%V
   (at level 50, c at next level, no associativity) : valid_scope.
+
+
+
+

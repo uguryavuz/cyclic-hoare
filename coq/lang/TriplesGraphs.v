@@ -36,12 +36,10 @@ Module RGP <: RuleGraphParams.
 
   Variant rule_aux :=
     | HL_CSQ
-    | HL_Case
     | HL_Skip
     | HL_Assn
     | HL_Seq
-    | HL_IfTrue
-    | HL_IfFalse
+    | HL_If
     | HL_WhileTrue
     | HL_WhileFalse.
   Definition rule := rule_aux.
@@ -49,18 +47,14 @@ Module RGP <: RuleGraphParams.
   Variant valid_rule_aux : rule -> list stmt -> stmt -> Prop :=
     | Valid_HL_CSQ c P P' Q Q' : 
         valid_rule_aux HL_CSQ [(|- (P->P')); (|- c : P' => Q'); (|- (Q'->Q))] (|- c : P => Q)
-    | Valid_HL_Case c P P' Q : 
-        valid_rule_aux HL_Case [(|- c : P /\ P' => Q); (|- c : P /\ ~ P' => Q)] (|- c : P => Q)
     | Valid_HL_Skip P : 
         valid_rule_aux HL_Skip [] (|- CSkip : P => P)
     | Valid_HL_Assn x a P : 
         valid_rule_aux HL_Assn [] (|- CAssn x a : P[a/x] => P)
     | Valid_HL_Seq c1 c2 P Q R : 
         valid_rule_aux HL_Seq [(|- c1 : P => Q); (|- c2 : Q => R)] (|- CSeq c1 c2 : P => R)
-    | Valid_HL_IfTrue c P Q (b:bexp) c' : 
-        valid_rule_aux HL_IfTrue [(|- c : P /\ b => Q)] (|- CIf b c c' : P /\ b => Q)
-    | Valid_HL_IfFalse c P Q (b:bexp) c' :
-        valid_rule_aux HL_IfFalse [(|- c' : P /\ ~b => Q)] (|- CIf b c c' : P /\ ~b => Q)
+    | Valid_HL_If c P Q (b:bexp) c' : 
+        valid_rule_aux HL_If [(|- c : P /\ b => Q); (|- c' : P /\ ~b => Q)] (|- CIf b c c' : P => Q)
     | Valid_HL_WhileTrue c P Q (b:bexp) : 
         valid_rule_aux HL_WhileTrue [(|- CSeq c (CWhile b c) : P /\ b => Q)] (|- CWhile b c : P /\ b => (Q /\ ~b))
     | Valid_HL_WhileFalse P b c : 
@@ -90,23 +84,6 @@ Proof.
   specializes H2 H0.
   apply H3.
   trivial.
-Qed.
-
-Lemma case_sound c P Q P' 
-  (H1 : |= c : P /\ P' => Q) 
-  (H2 : |= c : P /\ ~ P' => Q) 
-  : |= c : P => Q.
-Proof.
-  unfolds valid_triple, triple, valid_assrt.
-  intros.
-  simpls.
-  specializes H1 m I.
-  specializes H2 m I.
-  destruct (classic (m+I |= P')).
-  + specializes H1 (conj H H3). 
-    specializes~ H1 H0.
-  + specializes H2 (conj H H3). 
-    specializes~ H2 H0.
 Qed.
 
 Lemma skip_sound P : |= CSkip : P => P.
@@ -143,36 +120,22 @@ Proof.
   specializes H m I.
 Qed.
 
-Lemma if_true_sound (b:bexp) c c' P Q :
+Lemma if_sound (b:bexp) c c' P Q :
   |= c : P /\ b => Q ->
-  |= CIf b c c' : P /\ b => Q.
+  |= c' : P /\ ~b => Q ->
+  |= CIf b c c' : P => Q.
 Proof.
   unfolds valid_triple, triple, valid_assrt.
-  intros.
-  simpls.
-  unfolds in H1.
-  exists* H1. sort.
-  assert (H2 : beval m b) by (destruct H0; now rewrite bexp_assrt_equiv in H2).
-  inverts H1. inverts H3. 2 : contradiction.
-  specializes H H0. 
-  assert (H3 : yields c'0 m'0 m') by (unfolds; exists~ n0).
-  specializes~ H H3.
-Qed.
-
-Lemma if_false_sound (b:bexp) c c' P Q :
-  |= c' : P /\ ~ b => Q ->
-  |= CIf b c c' : P /\ ~ b => Q.
-Proof.
-  unfolds valid_triple, triple, valid_assrt.
-  intros.
-  simpls.
-  unfolds in H1.
-  exists* H1. sort.
-  assert (H2 : ~ beval m b) by (destruct H0; now rewrite bexp_assrt_equiv in H2).
-  inverts H1. inverts H3. contradiction.
-  specializes H H0.
-  assert (H3 : yields c'0 m'0 m') by (unfolds; exists~ n0).
-  specializes~ H H3.
+  intros. simpls.
+  unfolds in H2.
+  exists* H2. sort.
+  destruct (beval m b) eqn:E.
+  - inverts H2. inverts H3. 2 : contradiction.
+    applys H m'0. splits~. now rewrite bexp_assrt_equiv.
+    exists~ n0.
+  - inverts H2. inverts H3. now rewrite E in Hg.
+    applys H0 m'0. splits~. now rewrite bexp_assrt_equiv.
+    exists~ n0.
 Qed.
 
 Lemma yields_while_unroll b c m m' :
@@ -232,12 +195,10 @@ Proof.
     end. 
   inverts H0; prem_open; unfolds valid_stmt.
   + applys csq_sound H3 H2 H4.
-  + applys case_sound H3 H2.
   + applys skip_sound.
   + applys assn_sound.
   + applys seq_sound H3 H2.
-  + applys if_true_sound H3.
-  + applys if_false_sound H3.
+  + applys if_sound H3 H2.
   + applys while_true_sound H3.
   + applys while_false_sound.
 Qed. 
