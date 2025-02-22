@@ -362,8 +362,13 @@ Lemma form_3_skip nd P Q :
 Proof.
   intros Conc HP.
   pose proof rg_wf nd. rewrite Conc in H.
-  (* TODO will rely on acyclicity *)
-Admitted.
+  pose proof acyclic_soundness acyclic lift_valid (@hl_sound rg) nd.
+  rewrite Conc in H0. unfolds in H0.
+  simpls. introv.
+  specializes HP m I. specializes H0 HP m.
+  apply H0. unfolds. exists O.
+  constructor.
+Qed.
 
 Lemma form_2_seq nd P Q :
   rg_conc nd = form_2 P Q ->
