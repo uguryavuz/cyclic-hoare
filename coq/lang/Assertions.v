@@ -669,6 +669,18 @@ Proof.
   destruct H1; auto.
 Qed.
 
+Lemma valid_and P Q :
+  |= (P /\ Q) <->
+  |= P /\ |= Q.
+Proof.
+  splits; introv ?.
+  - splits; introv;
+    specializes H m I; now simpls.
+  - introv. destruct H.
+    specializes H m I. specializes H0 m I.
+    simpls. auto.
+Qed.
+
 End ValidRules.
 
 

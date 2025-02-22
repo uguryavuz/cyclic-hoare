@@ -160,7 +160,7 @@ Definition rules_in_graph_sound :=
   (exists nd, @rg_rule rg nd = Rule rule) -> 
   sound_rule rule.
 
-Definition valid_rule_graph : Prop :=
+Definition graph_lift_valid : Prop :=
   forall (nd : rg_node), 
     match rg_rule nd with
     | Lift => valid_stmt (rg_conc nd)
@@ -509,11 +509,11 @@ Definition is_cyclic_path (p : path) : Prop :=
     List.NoDup (List.tl nodelist) /\
     (length nodelist > 1)%nat.
 
-Definition is_cyclic_rule_graph : Prop :=
+Definition cyclic : Prop :=
   exists (p : path), is_cyclic_path p.
 
 Lemma cyclic_graph_implies_longer_path_exists : 
-  is_cyclic_rule_graph ->
+  cyclic ->
   forall (p : path), 
     exists (p' : path), 
       length (proj1_sig p') > length (proj1_sig p).
@@ -523,7 +523,7 @@ Proof.
   simpl.
   destruct p as [| hd tl] eqn:Hpdef.
   + rewrite LibList.length_nil.
-    unfold is_cyclic_rule_graph in H.
+    unfold cyclic in H.
     destruct H as [cyclic_path Hcyc].
     destruct Hcyc as [H1 [H2 H3]].
     exists cyclic_path.
@@ -535,7 +535,7 @@ Proof.
       math.
     }
     remember (length p) as n.
-    unfold is_cyclic_rule_graph in H.
+    unfold cyclic in H.
     destruct H as [cyclic_path Hcyc].
     destruct Hcyc as [H2 [H3 H4]].
     exists (@iterated_looping_path cyclic_path H2 n).
@@ -825,7 +825,7 @@ Lemma longer_path_exists_implies_cyclic_graph :
   (forall (p : path), 
     exists (p' : path), 
       length (proj1_sig p') > length (proj1_sig p)) ->
-  is_cyclic_rule_graph.
+  cyclic.
 Proof.
   intros.
   assert (H_empty : is_path ([])%list) by (now simpl).
@@ -850,7 +850,7 @@ Proof.
   clear H_ne ne_path.
   specialize (H_arb_len_path (NodeSet.cardinal rg.(rg_nodes))) as G.
   destruct G as [p H_p].
-  unfold is_cyclic_rule_graph.
+  unfold cyclic.
   apply path_longer_than_card_has_dupes, path_with_dupes_has_cycle in H_p.
   exists* H_p.
   now exists p2.
@@ -860,7 +860,7 @@ Theorem longer_path_exists_iff_cyclic_graph :
   (forall (p : path), 
     exists (p' : path), 
       length (proj1_sig p') > length (proj1_sig p)) <->
-  is_cyclic_rule_graph.
+  cyclic.
 Proof.
   split.
   apply longer_path_exists_implies_cyclic_graph.
@@ -868,7 +868,7 @@ Proof.
 Qed.
 
 Theorem acyclic_implies_longest_path : 
-  ~ is_cyclic_rule_graph ->
+  ~ cyclic ->
   exists (p : path), 
     forall (p' : path), 
       length (proj1_sig p') <= length (proj1_sig p).
@@ -885,8 +885,33 @@ Proof.
   math.
 Qed.
 
-Definition longest_path (H : ~ is_cyclic_rule_graph) : path :=
+Definition longest_path (H : ~ cyclic) : path :=
   proj1_sig (constructive_indefinite_description _ (acyclic_implies_longest_path H)).
+
+Lemma cyclic_cardinal :
+  cyclic <-> exists (p:path),
+  length (proj1_sig p) > cardinal (rg_nodes rg).
+Proof.
+  splits; intros.
+  - destruct H as (p&LN&Dup&?).
+    pose proof iterated_looping_nodelist_length LN (S (cardinal (rg_nodes rg))).
+    assert (looping_path p) by auto.
+    pose proof iterated_looping_path_is_path H1 (S (cardinal (rg_nodes rg))).
+    exists (exist _ _ H2). simpls.
+    replace H1 with LN by apply proof_irrelevance.
+    rewrite H0. remember (length (proj1_sig p)) as l.
+    replace (length (List.tl _)) with (pred l).
+    2: { 
+      destruct p. simpls. subst l. destruct x.
+      simpls. rewrite length_nil. math.
+      simpls. rewrite length_cons. math. 
+    }
+    destruct l. simpls. math.
+    simpls. destruct l. simpls. math.
+    simpls. math.
+  - exists* H. apply path_longer_than_card_has_dupes, path_with_dupes_has_cycle in H.
+    exists* H. subst. exists~ p2.
+Qed.
 
 End Cycles.
 
@@ -907,7 +932,7 @@ Qed.
 
 Section Depth.
 
-Variable A : ~ is_cyclic_rule_graph.
+Variable A : ~ cyclic.
 
 Notation is_prem prem nd := (List.In prem (rg_prems nd)).
 
@@ -1190,7 +1215,7 @@ Proof.
 Qed.
 
 Corollary acyclic_soundness :
-  valid_rule_graph ->
+  graph_lift_valid ->
   rules_in_graph_sound ->
   forall nd, valid_stmt (@rg_conc rg nd).
 Proof.
@@ -1213,6 +1238,13 @@ End Depth.
 
 End RuleGraphInstance.
 
+Definition derives rg s :=
+  graph_lift_valid rg /\
+  exists nd, @rg_conc rg nd = s.
+
+Definition derivable s :=
+  exists rg, derives rg s.
+
 (* A statement is valid if 
    a graph exists where 
    1. all lifted statements in the graph are valid
@@ -1221,17 +1253,32 @@ End RuleGraphInstance.
 *)
 Theorem sound_from_acyclic_graph :
   forall (s:stmt),
-  (exists (rg:rule_graph),
-    valid_rule_graph rg /\ 
-    ~ is_cyclic_rule_graph rg /\
-    rules_in_graph_sound rg /\
-    exists nd, @rg_conc rg nd = s
+  (exists rg, 
+    derives rg s /\ 
+    ~ cyclic rg /\
+    rules_in_graph_sound rg
   ) ->
   valid_stmt s.
 Proof.
   intros. exists* H.
+  destruct H. destruct H2.
   rewrite <- H2.
   apply~ acyclic_soundness.
 Qed.
+
+
+Definition relatively_complete :=
+  forall (s : stmt),
+  valid_stmt s ->
+  exists rg,
+  derives rg s /\ rules_in_graph_sound rg.
+
+
+Definition relatively_complete_acyclic :=
+  forall (s : stmt),
+  valid_stmt s ->
+  exists rg,
+  derives rg s /\ rules_in_graph_sound rg /\ 
+  ~ cyclic rg.
 
 End RuleGraph.
