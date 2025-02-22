@@ -252,9 +252,6 @@ Definition form_1 P Q :=
 Definition form_2 P Q :=
   |- (CSeq CSkip (CWhile true CSkip)) : P => Q.
 
-Definition form_3 P Q :=
-  |- CSkip : P => Q.
-
 Implicit Type nd : rg_node rg.
 
 Lemma form_1_rules nd P Q :
@@ -292,19 +289,6 @@ Proof.
   }
   rewrite Conc in H. unfolds form_2.
   destruct~ r; inverts H.
-Qed.
-
-Lemma form_3_rules nd P Q :
-  rg_conc nd = form_3 P Q ->
-  rg_rule nd = Rule RGP.HL_CSQ \/ 
-  rg_rule nd = Rule RGP.HL_Skip.
-Proof.
-  intros Conc.
-  pose proof rg_wf nd.
-  destruct (rg_rule nd).
-  2: { now rewrite Conc in H. }
-  rewrite Conc in H.
-  inverts~ H.
 Qed.
 
 Lemma strong_csq nd P Q c :
@@ -355,21 +339,6 @@ Proof.
   rewrite F in H1. inverts~ H1.
 Qed.
 
-Lemma form_3_skip nd P Q :
-  rg_conc nd = form_3 P Q ->
-  (|= P)%V ->
-  (|= Q)%V.
-Proof.
-  intros Conc HP.
-  pose proof rg_wf nd. rewrite Conc in H.
-  pose proof acyclic_soundness acyclic lift_valid (@hl_sound rg) nd.
-  rewrite Conc in H0. unfolds in H0.
-  simpls. introv.
-  specializes HP m I. specializes H0 HP m.
-  apply H0. unfolds. exists O.
-  constructor.
-Qed.
-
 Lemma form_2_seq nd P Q :
   rg_conc nd = form_2 P Q ->
   rg_rule nd = Rule RGP.HL_Seq ->
@@ -389,7 +358,14 @@ Proof.
   rename Q0 into R.
   exists r0 R Q. splits~.
   2: { right. constructor~. }
-  applys~ form_3_skip r P.
+
+  pose proof rg_wf r. rewrite <- H2 in H.
+  pose proof acyclic_soundness acyclic lift_valid (@hl_sound rg) r.
+  rewrite <- H2 in H1. unfolds in H1.
+  simpls. introv.
+  specializes HP m I. specializes H1 HP m.
+  apply H1. unfolds. exists O.
+  constructor.
 Qed.
 
 Definition has_form nd P Q :=
