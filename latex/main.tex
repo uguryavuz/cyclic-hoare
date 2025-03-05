@@ -283,25 +283,118 @@ We derive this result from local soundness.
 \hfill $\qed$
 
 
-\subsection{Incompleteness}
+\subsection{Incompleteness of Acyclic Unary HL}
 
 \begin{lemma}
-    $\VAL \Triple {\While {\True} do {\Skip} } : \True => \False$.
+    For any $P$ and $Q$,
+    $\VAL \Triple {\While {\True} do {\Skip} } : P => Q$.
 \end{lemma}
 \begin{proof}
-    todo
+    By strong induction on the number of execution steps.
 \end{proof}
 
 \begin{lemma}
-    $\Triple {\While {\True} do {\Skip} } : \True => \False$ is not derivable.
+    $\Triple {\While {\True} do {\Skip} } : \True => \False$ is not derivable using acyclic proof graphs.
 \end{lemma}
+\begin{proof}
+Suppose for contradiction that we have a lift-valid, acyclic graph $G$ for which
+$$\DERby G {\Triple {\While {\True} do {\Skip} } : \True => \False}$$
+
+We consider two families of statements within $G$: %forms. 
+%In all cases, we pres that $P$ and $R$ are any tautologies, and $Q$ is any contradiction.
+\begin{enumerate}[label=(\roman*)]
+\item $\Triple {\While {\True} do {\Skip} } : P => Q$ where $P$ is a tautology. \\
+    The only rules that we can possibly apply to this statement are \textsc{HL-Csq},
+    or potentially \textsc{HL-While-T} depending on the shape of $P$ and $Q$.
+    %
+    \[\begin{prooftree}
+        \hypo{\VAL P \Rightarrow P'}
+        \hypo{\DER \Triple {\While {\True} do {\Skip} } : P' => Q'}
+        \hypo{\VAL Q' \Rightarrow Q}
+        \infer3[\textsc{HL-Csq}] 
+            {\DER \Triple {\While {\True} do {\Skip} } : P => Q}
+    \end{prooftree}\]
+%
+    Note that because $P$ is a tautology and $\VAL P \Rightarrow P'$,
+    it must be $P'$ is a tautology.
+    %Similarly, $Q'$ must be a contradiction.
+    Thus the middle premise must have form (i).
+    
+    \[\begin{prooftree}
+        \hypo{\DER \Triple {\Seq {\Skip} ; {\While {\True} do {\Skip}} } : P => Q'}
+        \infer1[\textsc{HL-While-T}] 
+            {\DER \Triple {\While {\True} do {\Skip} } : P => Q }
+    \end{prooftree}\]
+
+    Supposing that $P$ is of an appropriate form to apply \textsc{HL-While-T},
+    the resulting premise will also have precondition $P$.
+    So the premise will have form (ii).
+    
+    The only other candidate for a rule would be \textsc{HL-While-F}.
+    % However, this requires $P$ to have the form $R \wedge \neg \True$.
+    However, this requires $P$ to have the form $P' \wedge \neg \True$ for some $P'$,
+    which would mean $P$ is not a tautology. %it a contradiction.
+    % We assumed $P$ to be a tautology, but $R \wedge \neg \True$ is a contradiction.
+    So \textsc{HL-While-F} is not applicable.
+
+\item $\Triple {\Seq \Skip ; {\While {\True} do {\Skip}} } : P => Q$ where $P$ is a tautology. \\
+    The only rules we can apply here are \textsc{HL-Csq} and \textsc{HL-Seq}.
+%
+    \[\begin{prooftree}
+        \hypo{\VAL P \Rightarrow P'}
+        \hypo{\DER \Triple {\Seq \Skip ; {\While {\True} do {\Skip}} } : P' => Q'}
+        \hypo{\VAL Q' \Rightarrow Q}
+        \infer3[\textsc{HL-Csq}] 
+            {\DER \Triple {\Seq \Skip ; {\While {\True} do {\Skip}} } : P => Q}
+    \end{prooftree}\]
+%
+    By analogous reasoning to that in case (i),
+    the middle premise must have form (ii).
+    %
+    \[\begin{prooftree}
+        \hypo{\DER \Triple \Skip : P => R}
+        \hypo{\DER \Triple {\While {\True} do {\Skip} } : R => Q}
+        \infer2[\textsc{HL-Seq}] 
+            {\DER \Triple {\Seq \Skip ; {\While {\True} do {\Skip}} } : P => Q}
+    \end{prooftree}\]
+%
+    Because we assume $G$ to be a valid proof,
+    and we have proven acyclic soundness for UHL,
+    then $\DER \Triple \Skip : P => R$ appearing in the graph
+    must mean that $\VAL \Triple \Skip : P => R$.
+    As a result, because $P$ is a tautology, $R$ must then be a tautology.
+    Thus the right premise has form (i).
+    
+%\item $\Triple {\Skip} : P => R$\\
+%    If $P = R$, then we can apply \textsc{HL-Skip} to dispatch this statement.
+%    We also can always apply \textsc{HL-Csq}.
+\end{enumerate}
+
+Observe that any proof of any statement of forms (i) or (ii)
+must depend on another statement of one of those forms.
+There is also at least one statement in $G$ with one of these forms;
+namely 
+$\Triple {\While {\True} do {\Skip} } : \True => \False$ is of form (i).
+%
+We can therefore show inductively that a path of arbitrary length
+can be formed by chaining together statements of forms (i) and/or (ii).
+This means by Lemma~\ref{lem:cyclic-iff-no-longest-path} that $G$ is cyclic, contradicting our premise.
+
+%$\Triple {\While {\True} do {\Skip} } : \True => \False$ is of form (i).
+%Therefore, no acyclic proof of said statement exists.
+
+\end{proof}
 
 \begin{theorem}
     The rules in Fig.~\ref{fig:unary-hl-rules}
-    are incomplete. Namely, a valid statement $\VAL\Triple c : P => Q$ exists where $\DER \Triple c : P => Q$ is not derivable, even given an oracle for liftable statements.
+    are incomplete for acyclic proof graphs. 
+    %Namely, a valid statement $\VAL\Triple c : P => Q$ exists where $\DER \Triple c : P => Q$ is not derivable, even given an oracle for liftable statements.
 \end{theorem}
 \begin{proof}
-By prior lemmata.
+By prior lemmata,
+$\Triple {\While {\True} do {\Skip} } : \True => \False$
+is valid but not derivable.
+Thus by definition, the proof rules are incomplete.
 \end{proof}
 
 
