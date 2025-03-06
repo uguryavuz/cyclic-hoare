@@ -53,10 +53,10 @@ such that for every $\node \in \DomNode$:
     where $\abs{p} = n$, then
     \[
         \inferrule{
-            \DER \MapConc(\MapPrems_1(\node))
+            \MapConc(\MapPrems_1(\node))
             \\ \cdots \\
-            \DER \MapConc(\MapPrems_n(\node))
-        }{ \DER \MapConc(\node) }
+            \MapConc(\MapPrems_n(\node))
+        }{ \MapConc(\node) }
     \]
     is a syntactically valid instance of $r$,\\
     where $\MapPrems_i(\node)$
@@ -208,10 +208,11 @@ which is impossible in an acyclic graph.
 \newcommand{\DERby}[2]{\DER_{#1}{#2}}
 
 \begin{definition}
-    $S$ is \emph{derivable via graph} $G$, denoted $\DERby G S$,
-    if $S \in G$ and $G$ is lift-valid.\\
-    $S$ is \emph{derivable}, denoted $\DER S$,
-    if a graph $G$ exists s.t.\ $\DERby G S$.
+    $S$ is \emph{derivable via} a graph $G$, 
+    denoted $\DERby G S$,
+    if $S \in G$ and $G$ is lift-valid.
+    $S$ is \emph{acyclically derivable}, denoted $\DER S$,
+    if an acyclic graph $G$ exists s.t.\ $\DERby G S$.
     %if a lift-valid graph $(\_, conc, \_, \_)$ exists
     %which is lift-valid, and
     %where $S \in \text{Im}(conc)$.
@@ -266,3 +267,13 @@ Normalization procedure for DAG:
 \begin{conjecture}
 If 
 \end{conjecture}
+
+
+\subsection{Admissibility}
+
+\begin{definition}
+    Consider a proof system with a set of rules $\DomRule$.
+    A rule with premises $S_i$ and conclusion $C$ 
+    is \emph{acyclically admissible} w.r.t.\ $\DomRule$ if
+    $\forall i.\ \DER S_i \implies \DER C$.
+\end{definition}

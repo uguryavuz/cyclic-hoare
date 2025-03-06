@@ -1,0 +1,370 @@
+
+\section{Proof system for unary Hoare logic}
+
+\paragraph{Hoare judgements}
+We define partial Hoare triples:
+\begin{definition}
+    $m$ \emph{satisfies}
+    $\Triple c : P => Q$ in $I$,
+    denoted $\AVALmi \Triple c : P => Q$,
+    iff    
+    $$\AVALmi P \implies \forall m'.\
+    \Yields(c,m,m') \implies
+    %\Cfg(c,m) \sstepstotrans \Cfg(\Skip,m') \implies
+    \AVAL m'|I|-Q.$$
+%
+$\AVALU \Triple c : P => Q$ denotes
+that the triple is \emph{valid},
+namely $\AVALmi \Triple c : P => Q$
+for \emph{all} $m$ and $I$.
+\end{definition}
+
+We write $\DER \Triple c : P => Q$ to say that
+the triple is \emph{derivable} in Hoare logic.
+
+\iffalse
+\begin{displaymath}
+\begin{array}{lcl}
+    \Triple c : P => Q
+    & \triangleq &
+    \forall m \in P, m'.\
+    \Cfg(c,m) \sstepstotrans \Cfg(\Skip,m') \implies
+    m' \in Q
+\end{array}
+\end{displaymath}
+\fi
+
+\begin{figure}[h]
+\label{fig:unary-hl-rules}
+
+\paragraph{Structural rules}
+
+\begin{mathpar}
+    % Conseq
+    \inferrule*[right=HL-Csq]
+    { \VAL P \implies P' \\ 
+      \DER \Triple c : P' => Q' \\ 
+      \VAL Q' \implies Q }
+    { \DER \Triple c : P => Q }
+    % Case
+    \iffalse
+    \and 
+    \inferrule*[right=HL-Case]
+    { % \VAL P \Longrightarrow P' \vee \neg P' \\
+      \DER \Triple c : P \wedge P' => Q \\ 
+      \DER \Triple c : P \wedge \neg P' => Q }
+    { \DER \Triple c : P => Q }
+    \and
+    %\inferrule*[right=HL-False]
+    %{ }{ \DER \Triple c : \EFalse => Q }
+    \fi
+\end{mathpar}
+
+
+\paragraph{Symbolic execution rules}
+
+
+\begin{mathpar}
+    %\inferrule*[right=HL-Abort]
+    %{ }
+    %{ \DER \Triple \Abort : P => Q }
+    %\and
+    \inferrule*[right=HL-Skip] 
+    { }
+    { \DER \Triple \Skip : P => P }
+    \and
+    \inferrule*[right=HL-Assn]
+    { }
+    { \DER \Triple \Assn x = a : \Subst P[a/x] => P }
+    \and
+    \inferrule*[right=HL-Seq]
+    { \DER \Triple c : P => Q \\ \DER \Triple c' : Q => R }   
+    { \DER \Triple \Seq c;c' : P => R }
+    \and
+    \inferrule*[right=HL-If]
+    { \DER \Triple c : P \wedge b => Q \\
+        \DER \Triple c' : P \wedge \neg b => Q}
+    { \DER \Triple \ITE b then c else c' : P \wedge b => Q }
+    \\
+    \inferrule*[right=HL-While-T]
+    { \DER \Triple \Seq c; \While b do c : P \wedge b => Q }
+    { \DER \Triple \While b do c : P \wedge b => Q \wedge \neg b }
+    \and
+    \inferrule*[right=HL-While-F]
+    { }
+    { \DER \Triple \While b do c : P \wedge \neg b => P \wedge \neg b }
+\end{mathpar}
+
+\caption{All rules for unary Hoare logic.}
+
+\end{figure}
+
+
+\noindent
+These rules are \emph{not} enough to subsume loop invariants, but with cyclic proofs they will be.
+These rules are enough to recover a branching \emph{if} rule (using \emph{case}).
+
+
+
+\subsection*{Local soundness}
+In the case of unary HL,
+statements are triples of the form
+$\Triple c : P => Q$, and
+assertions $P$,
+where the latter comprise the liftable statements;
+and the rules consist of the structural and symbolic execution rules defined above.
+
+
+\begin{lemma}
+    Each proof rule (structural and symbolic execution) are locally sound.
+    %If $\DER \Triple c : P => Q$
+    %then $\VAL \Triple c : P => Q$.
+\end{lemma}
+
+\noindent
+\emph{Proof.}
+
+\subsubsection*{\textsc{HL-Csq}}
+We show if $\VAL P \implies P'$ and 
+      $\VAL \Triple c : P' => Q'$ and 
+      $\VAL Q' \implies Q$
+then $\VAL \Triple c : P => Q$.
+% We are given that $\forall m \in P : m \in P'$
+% and that $\forall m \in Q' : m \in Q$.
+The triple we are given unfolds to
+\[
+    \forall m \in \Interp{P'}, m'.\
+    \Cfg(c, m) \sstepstotrans \Cfg(\Skip, m')
+    \implies m' \in \Interp{Q'}.
+\]
+We want to show that
+\[
+    \forall m \in \Interp P, m'.\
+    \Cfg(c, m) \sstepstotrans \Cfg(\Skip, m')
+    \implies m' \in \Interp Q.
+\]
+Note that we are also given $\Interp{P} \subseteq \Interp{P'}$ and $\Interp{Q'} \subseteq \Interp{Q}$,
+so the claim immediately follows.
+
+\subsubsection*{\textsc{HL-Case}}
+We show if $\ \VAL \Triple c : P \wedge e => Q\ $ and
+      $\ \VAL \Triple c : P \wedge \neg e => Q\ $ then
+    $\ \VAL \Triple c : P => Q$.
+Note that this rule is for Boolean expressions $e$,
+so for any memory $m$, we have that $\Eval(e,m) = \True$
+or $\Eval(e,m) = \False$.
+
+The two triples unfold to
+\[
+    \forall m \in \Interp{P \wedge e}, m'.\
+    \Cfg(c, m) \sstepstotrans \Cfg(\Skip, m') 
+    \implies m' \in Q.
+\]
+Note
+
+We are given that for any $m$. $m \in P \wedge \Eval(e,m) = \True \implies $
+\todo{todo}
+
+\subsubsection*{\textsc{HL-False}}
+We show $\VAL \Triple c : \EFalse => P$.
+This unfolds to
+\[
+    \forall m \in \Interp{\EFalse}, m'.\
+    \Cfg(c, m) \sstepstotrans \Cfg(\Skip, m') 
+    \implies m' \in \Interp{P}.
+\]
+Note that for any $m$, $m \notin \Interp{\EFalse}$,
+so this is vacuously true.
+
+\subsubsection*{\textsc{HL-Skip}}
+We show $\VAL \Triple \Skip : P => P$.
+This unfolds to 
+$$\forall m \in \Interp{P}, m'.\
+\Cfg(\Skip,m) \sstepstotrans \Cfg(\Skip,m') \implies
+m' \in \Interp{P}.$$
+$\Cfg(\Skip,m)$ steps to nothing,
+so the only possibility is $m' = m$.
+Therefore $m \in \Interp{P} \implies m' = m \in \Interp{P}$.
+
+\subsubsection*{\textsc{HL-Assn}}
+We show $\VAL \Triple \Assn x = e : \Subst P[e/x] => P$.
+\todo{todo}
+
+\subsubsection*{\textsc{HL-Seq}}
+We show if $\VAL \Triple c : P => Q$ and $\VAL \Triple c' : Q => R$
+then $\VAL \Triple \Seq c;c' : P => R$.
+\todo{todo}
+    
+\subsubsection*{\textsc{HL-If-T}}
+We show if $\VAL \Triple c : P \wedge e => Q$ then
+    $\VAL \Triple \ITE e then c else c' : P \wedge e => Q$.
+\todo{todo}
+
+\subsubsection*{\textsc{HL-If-F}}
+We show if $\VAL \Triple c' : P \wedge \neg e => Q$ then
+    $\VAL \Triple \ITE e then c else c' : P \wedge \neg e => Q$.
+\todo{todo}
+
+\subsubsection*{\textsc{HL-While-T}}
+We show if $\VAL \Triple \Seq c; \While e do c : P \wedge e => Q$ then
+    $\VAL \Triple \While e do c : P \wedge e => Q \wedge \neg e$. 
+\todo{todo}
+
+\subsubsection*{\textsc{HL-While-F}}
+We show~~$\VAL \Triple \While e do c : P \wedge \neg e => P \wedge \neg e$.
+This unfolds to
+$$\forall m \in P \wedge \neg e, m'.\
+\Cfg(\While e do c,m) \sstepstotrans \Cfg(\Skip,m') \implies
+m' \in P \wedge \neg e.$$
+
+$m \in P \wedge \neg e$, which means $\Eval(e,m) = \False$
+(or $\Eval(e,m) = \bot$, in which case the config cannot step at all and statement holds vacuously),
+so $\Cfg(\While e do c,m) \sstepsto \Cfg(\Skip,m)$ by \textsc{SS-While-F}.
+Thus $m' = m$, so $m' = m \in P \wedge \neg e$.
+
+
+\hfill $\qed$
+
+\subsection*{Unary Soundness}
+\begin{theorem}
+If $\DER \Triple c : P => Q$ then $\VAL \Triple c : P => Q$.
+\end{theorem}
+
+\noindent
+\emph{Proof.}
+
+\noindent
+We derive this result from local soundness.
+\todo{todo induction on programs?}
+\hfill $\qed$
+
+
+\subsection{Incompleteness of Acyclic Unary HL}
+
+\begin{lemma}
+    For any $P$ and $Q$,
+    $\VAL \Triple {\While {\True} do {\Skip} } : P => Q$.
+\end{lemma}
+\begin{proof}
+    By strong induction on the number of execution steps.
+\end{proof}
+
+\begin{lemma}
+    $\Triple {\While {\True} do {\Skip} } : \True => \False$ is not derivable using acyclic proof graphs.
+\end{lemma}
+\begin{proof}
+Suppose for contradiction that we have a lift-valid, acyclic graph $G$ for which
+$$\DERby G {\Triple {\While {\True} do {\Skip} } : \True => \False}$$
+
+We consider two families of statements within $G$: %forms. 
+%In all cases, we pres that $P$ and $R$ are any tautologies, and $Q$ is any contradiction.
+\begin{enumerate}[label=(\roman*)]
+\item $\Triple {\While {\True} do {\Skip} } : P => Q$ where $P$ is a tautology. \\
+    The only rules that we can possibly apply to this statement are \textsc{HL-Csq},
+    or potentially \textsc{HL-While-T} depending on the shape of $P$ and $Q$.
+    %
+    \[\begin{prooftree}
+        \hypo{\VAL P \Rightarrow P'}
+        \hypo{\DER \Triple {\While {\True} do {\Skip} } : P' => Q'}
+        \hypo{\VAL Q' \Rightarrow Q}
+        \infer3[\textsc{HL-Csq}] 
+            {\DER \Triple {\While {\True} do {\Skip} } : P => Q}
+    \end{prooftree}\]
+%
+    Note that because $P$ is a tautology and $\VAL P \Rightarrow P'$,
+    it must be $P'$ is a tautology.
+    %Similarly, $Q'$ must be a contradiction.
+    Thus the middle premise must have form (i).
+    
+    \[\begin{prooftree}
+        \hypo{\DER \Triple {\Seq {\Skip} ; {\While {\True} do {\Skip}} } : P => Q'}
+        \infer1[\textsc{HL-While-T}] 
+            {\DER \Triple {\While {\True} do {\Skip} } : P => Q }
+    \end{prooftree}\]
+
+    Supposing that $P$ is of an appropriate form to apply \textsc{HL-While-T},
+    the resulting premise will also have precondition $P$.
+    So the premise will have form (ii).
+    
+    The only other candidate for a rule would be \textsc{HL-While-F}.
+    % However, this requires $P$ to have the form $R \wedge \neg \True$.
+    However, this requires $P$ to have the form $P' \wedge \neg \True$ for some $P'$,
+    which would mean $P$ is not a tautology. %it a contradiction.
+    % We assumed $P$ to be a tautology, but $R \wedge \neg \True$ is a contradiction.
+    So \textsc{HL-While-F} is not applicable.
+
+\item $\Triple {\Seq \Skip ; {\While {\True} do {\Skip}} } : P => Q$ where $P$ is a tautology. \\
+    The only rules we can apply here are \textsc{HL-Csq} and \textsc{HL-Seq}.
+%
+    \[\begin{prooftree}
+        \hypo{\VAL P \Rightarrow P'}
+        \hypo{\DER \Triple {\Seq \Skip ; {\While {\True} do {\Skip}} } : P' => Q'}
+        \hypo{\VAL Q' \Rightarrow Q}
+        \infer3[\textsc{HL-Csq}] 
+            {\DER \Triple {\Seq \Skip ; {\While {\True} do {\Skip}} } : P => Q}
+    \end{prooftree}\]
+%
+    By analogous reasoning to that in case (i),
+    the middle premise must have form (ii).
+    %
+    \[\begin{prooftree}
+        \hypo{\DER \Triple \Skip : P => R}
+        \hypo{\DER \Triple {\While {\True} do {\Skip} } : R => Q}
+        \infer2[\textsc{HL-Seq}] 
+            {\DER \Triple {\Seq \Skip ; {\While {\True} do {\Skip}} } : P => Q}
+    \end{prooftree}\]
+%
+    Because we assume $G$ to be a valid proof,
+    and we have proven acyclic soundness for UHL,
+    then $\DER \Triple \Skip : P => R$ appearing in the graph
+    must mean that $\VAL \Triple \Skip : P => R$.
+    As a result, because $P$ is a tautology, $R$ must then be a tautology.
+    Thus the right premise has form (i).
+    
+%\item $\Triple {\Skip} : P => R$\\
+%    If $P = R$, then we can apply \textsc{HL-Skip} to dispatch this statement.
+%    We also can always apply \textsc{HL-Csq}.
+\end{enumerate}
+
+Observe that any proof of any statement of forms (i) or (ii)
+must depend on another statement of one of those forms.
+There is also at least one statement in $G$ with one of these forms;
+namely 
+$\Triple {\While {\True} do {\Skip} } : \True => \False$ is of form (i).
+%
+We can therefore show inductively that a path of arbitrary length
+can be formed by chaining together statements of forms (i) and/or (ii).
+This means by Lemma~\ref{lem:cyclic-iff-no-longest-path} that $G$ is cyclic, contradicting our premise.
+
+%$\Triple {\While {\True} do {\Skip} } : \True => \False$ is of form (i).
+%Therefore, no acyclic proof of said statement exists.
+
+\end{proof}
+
+\begin{theorem}
+    The rules in Fig.~\ref{fig:unary-hl-rules}
+    are incomplete for acyclic proof graphs. 
+    %Namely, a valid statement $\VAL\Triple c : P => Q$ exists where $\DER \Triple c : P => Q$ is not derivable, even given an oracle for liftable statements.
+\end{theorem}
+\begin{proof}
+By prior lemmata,
+$\Triple {\While {\True} do {\Skip} } : \True => \False$
+is valid but not derivable.
+Thus by definition, the proof rules are incomplete.
+\end{proof}
+
+
+
+\subsection{Admissible Rules}
+
+\begin{conjecture}
+    The following rule is acyclically admissible w.r.t.\
+    the rules in \ref{fig:unary-hl-rules}:
+    \[ \inferrule*[right=HL-Case]{
+        \Triple c : P \wedge e => Q \\
+        \Triple c : P \wedge \neg e => Q
+    }{
+        \Triple c : P => Q
+    }
+    \]
+\end{conjecture}

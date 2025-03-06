@@ -149,3 +149,59 @@ $\Triple {\While {\True} do {\Skip} } : \True => \False$ is of form (i),
 so it must be that any proof of said statement is cyclic.
 
 \end{proof}
+
+
+
+\section{Proof Graphs}
+
+\begin{definition}
+    A proof graph is a finite \todo{todo}
+
+    We assume proof graphs to be minimal, i.e.\ any nodes with equivalent values
+    are identical nodes in the graph.
+\end{definition}
+
+\begin{definition}
+    A proof graph is \emph{locally sound} iff every node is locally sound,
+    and every leaf $\VAL P \implies Q$ holds.
+    A node is locally sound iff \todo{todo}
+\end{definition}
+
+\begin{conjecture}
+    If $\DER \Triple c : P => Q$ is on a node of a
+    acyclic locally sound proof graph,
+    then $\VAL \Triple c : P => Q$.
+\end{conjecture}
+
+\begin{definition}
+    A simple cycle in a proof graph is a sequence of mutually distinct nodes $n_1,\dots,n_k$ for $k > 0$
+    s.t.\ $n_i$ points to $n_{i+1}$ for all $i$, and $n_k$ points to $n_1$.
+    Recall the assumption that proof graphs contain no distinct duplicate nodes.
+\end{definition}
+
+\begin{conjecture}
+    Every cyclic proof graph contains finitely many simple cycles.
+\end{conjecture}
+
+%\begin{conjecture}
+%    Every infinite path in a cyclic proof graph
+%    consists of infinite traversals of one or more simple cycles.
+%\end{conjecture}
+
+\begin{conjecture}
+    If every simple cycle in a proof graph
+    contains an instance of \textsc{HL-While-T},
+    then every infinite path in the graph
+    contains infinitely many instances of \textsc{HL-While-T}.
+\end{conjecture}
+
+\begin{conjecture}
+    Consider a locally sound proof graph,
+    for which every simple cycle contains a node
+    with \textsc{HL-While-T}.
+    If $\DER \Triple c : P => Q$ is on a node of this graph,
+    then $\VAL \Triple c : P => Q$.
+\end{conjecture}
+
+
+
