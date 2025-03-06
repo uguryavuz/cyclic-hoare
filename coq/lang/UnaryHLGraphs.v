@@ -443,3 +443,19 @@ Proof.
 Qed.
 
 End AcyclicIncompleteness.
+
+
+Definition acyc_derivable stmt :=
+  exists rg,
+  derives rg stmt /\ ~ cyclic rg.
+
+Lemma case_admissible c :
+  forall e P Q,
+  acyc_derivable (|- c : P /\ e => Q) ->
+  acyc_derivable (|- c : P /\ ~ e => Q) ->
+  acyc_derivable (|- c : P => Q).
+Proof.
+  induction c; intros.
+  - admit.
+  - unfolds.
+Abort.
