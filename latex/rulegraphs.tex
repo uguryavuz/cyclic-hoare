@@ -1,5 +1,5 @@
 
-\section{Rule graphs}
+\section{Proof Systems and Rule Graphs}
 
 \newcommand*{\DomLiftable}{\mathit{Lift}}
 \newcommand*{\DomStmt}{\mathit{Stmt}}
@@ -10,25 +10,65 @@ Suppose we have a family of statements $\DomStmt$,
 where for each statement $S \in \DomStmt$
 we have a defined notion of validity,
 denoted $\VAL S$.
-%
-We also have a subset of \emph{liftable} statements
-$\DomLiftable \subseteq \DomStmt$;
-these are statements for which
-we are ``comfortable'' lifting a proof of their derivability
-to a metalogical proof of their validity.
-%
-We also have a family of rules $\DomRule$ of the form
-\[
-    \inferrule*[right=Rule-Name]{
-        \DER S_1 \\ \cdots \\ \DER S_n
-    }{
-        \DER C
-    }
-\]
+
+\newcommand*{\proofsysname}{\mathcal{L}}
+\newcommand*{\proofsys}[2]{\left\langle #1, #2\right\rangle}
+
+\newcommand*{\numprems}[1]{
+    \abs{#1}
+}
+
+\begin{definition}
+    A \emph{proof system} 
+    $\proofsysname = \proofsys\DomLiftable\DomRule$
+    consists of:
+    \begin{itemize}
+    \item A set of statements $\DomLiftable \subseteq \DomStmt$ considered \emph{liftable} into the ambient logic.
+    \item A finite family of \emph{rules}
+    $\DomRule = \set{r_i \subseteq \DomStmt \times \DomStmt^{n_i}}$.
+    Each rule $r_i$ is a nonempty relation which accepts
+    conclusion statements paired with
+    $n_i$ premise statements, where $n_i$ may be 0.
+    Denote the number of premises of a rule $r$
+    with $\numprems r$,
+    namely $\numprems r = n$ s.t.\
+    $r \subseteq \DomStmt \times \DomStmt^{n_i}$.
+
+    We may denote a rule with
+    \[
+        \inferrule*[right=Rule-Name]{
+            S_1 \\ \cdots \\ S_n
+        }{
+            C
+        }
+    \]
+    where $S_1,\dots,S_n$ and $C$ are statement patterns, i.e.\ functions which map into $\DomStmt$.
+    This would denote the rule (relation)
+    \[
+        \textsc{Rule-Name} =
+        \SetBuild(
+            c, \vec s \in \DomStmt \times \DomStmt^n
+        |
+            \exists \vec v.\
+            c = C(\vec v) \wedge
+            \vec s = \vec S(\vec v)
+        ).
+    \]
+    \end{itemize} 
+\end{definition}
 %
 \begin{definition}
-    A rule with premises $S_1,\dots,S_n$ and conclusion $C$ is \emph{locally sound} if
-    \[\VAL S_1 \wedge \cdots \wedge \VAL S_n \implies \VAL C.\]
+    \label{def:locally-sound-rule}
+    Rule $r$ is \emph{locally sound} if
+    \(
+        \forall c, \vec s \in r.\
+        \left(
+            \bigwedge_{s_i \in \vec s}
+            \VAL s_i
+        \right)
+        %\VAL s_1 \wedge \cdots \wedge \VAL s_{\numprems r} 
+        \implies \VAL c.
+    \)
 \end{definition}
 %
 
@@ -38,8 +78,13 @@ We also have a family of rules $\DomRule$ of the form
 \newcommand*{\MapRule}{\mathit{rule}}
 \newcommand*{\MapPrems}{\mathit{prems}}
 
+\subsection{Rule graphs}
+
 \begin{definition}
-A \emph{rule graph} is a tuple $G=(\DomNode,\MapConc,\MapRule,\MapPrems)$ for a
+In a proof system
+$\proofsysname = \proofsys\DomLiftable\DomRule$,
+a \emph{rule graph} 
+is a tuple $G=(\DomNode,\MapConc,\MapRule,\MapPrems)$ for a
 finite set of node names $\DomNode$,
 and mappings %from node names to statements 
     $\MapConc : \DomNode \ra \DomStmt$,
@@ -50,35 +95,31 @@ and mappings %from node names to statements
 such that for every $\node \in \DomNode$:
 \begin{itemize}
 \item If $\MapRule(\node) = r \in \DomRule$
-    where $\abs{p} = n$, then
-    \[
-        \inferrule{
-            \DER \MapConc(\MapPrems_1(\node))
-            \\ \cdots \\
-            \DER \MapConc(\MapPrems_n(\node))
-        }{ \DER \MapConc(\node) }
-    \]
-    is a syntactically valid instance of $r$,\\
-    where $\MapPrems_i(\node)$
-    denotes $\pi_i(\MapPrems(\node))$.
-\item Otherwise, if $\MapRule(\node) = \LIFT$,
+    %where $\abs{p} = n$, 
+    then
+    \(
+        \big(\MapConc(\node), \MapConc(\MapPrems(\node))\big) 
+        \in r
+    \).
+    %is a syntactically valid instance of $r$,\\
+    %where $\MapPrems_i(\node)$
+    %denotes $\pi_i(\MapPrems(\node))$.
+\item Otherwise if $\MapRule(\node) = \LIFT$,
     then $\MapPrems(\node) = []$ and 
     $\MapConc(\node) \in \DomLiftable$.
 \end{itemize}
 \end{definition}
 
-A statement is \emph{in} a graph if $S \in \mathrm{Im}(G.\MapConc)$.
-Denote with $S \in G$.
+A statement is \emph{in} a graph if $s \in \mathrm{Im}(G.\MapConc)$.
+Denote with $s \in G$.
 
 \begin{definition}
     A \emph{path} in a rule graph $(\DomNode,\MapConc,\MapRule,\MapPrems)$
-    is a possibly infinite sequence of nodes
-    $\node_1,\node_2,\dots$
-    all in $\DomNode$
+    is a (possibly infinite) sequence of nodes
+    $\node_1,\node_2,\dots \in \DomNode$
     such that
-    $\forall i > 0.\
-    \node_{i+1} \in \MapPrems(\node_i).
-    $
+    $\forall i.\
+    \MapPrems(\node_i) \ni \node_{i+1}$.
 \end{definition}
 
 \newcommand*{\reaches}[3]{%
@@ -156,13 +197,14 @@ if
 
 \begin{definition}
     A graph is \emph{locally sound} if
-    all rules in the graph are locally sound.
+    all rules in the graph are locally sound
+    (Def.~\ref{def:locally-sound-rule}).
 \end{definition}
 
 \begin{lemma}
     \label{lem:acyclic-soundness}
     If a graph $G$ is lift-valid, locally sound, and acyclic,
-    then $\VAL S$ for every $S \in G$.
+    then $\VAL s$ for every $s \in G$.
     %
     %Consider a graph $G=(\DomNode,\MapConc,\MapRule,\MapPrems)$.
     %and a node $\node \in \DomNode$.
@@ -207,21 +249,29 @@ which is impossible in an acyclic graph.
 
 \newcommand{\DERby}[2]{\DER_{#1}{#2}}
 
+\newcommand{\deracyc}{%
+    \Vdash
+    %\mathrel{\vdash\hspace*{-.5em}\circ}%
+}
+
 \begin{definition}
-    $S$ is \emph{derivable via graph} $G$, denoted $\DERby G S$,
-    if $S \in G$ and $G$ is lift-valid.\\
-    $S$ is \emph{derivable}, denoted $\DER S$,
-    if a graph $G$ exists s.t.\ $\DERby G S$.
-    %if a lift-valid graph $(\_, conc, \_, \_)$ exists
-    %which is lift-valid, and
-    %where $S \in \text{Im}(conc)$.
-    %contains $\node$
-    %where $\MapConc(\node) = S$.
+    Within a proof system $\proofsysname$,
+    $s$ is \emph{derivable} via a graph $G$, 
+    denoted $G \vdash_\proofsysname s$,
+    if $s \in G$ and $G$ is lift-valid.
+    $s$ is \emph{acyclically derivable} in $\proofsysname$, denoted $\vdash_\proofsysname S$,
+    if an acyclic graph $G$ exists s.t.\ 
+    $G \vdash_\proofsysname s$.
+    $s$ is \emph{(cyclically) derivable} in $\proofsysname$, denoted $\deracyc_\proofsysname s$,
+    if a (possibly cyclic) graph $G$ exists s.t.\ 
+    $G \vdash_\proofsysname s$.
 \end{definition}
 
-\begin{theorem}
-    For a statement $S$,
-    if $\DERby G S$ for an acyclic and locally sound graph $G$, %valid acyclic graph,
+\begin{theorem}[Acyclic Soundness]
+    %For a statement $s$,
+    If $G \vdash_\proofsysname s$
+    for an acyclic and locally sound $G$,
+    %if $\DERby G s$ for an acyclic and locally sound %graph $G$, %valid acyclic graph,
     %for which all contained rules are locally sound,
     then $\VAL S$.
 \end{theorem}
@@ -230,8 +280,27 @@ which is impossible in an acyclic graph.
     Follows from Lemma~\ref{lem:acyclic-soundness}.
 \end{proof}
 
+\subsection{Proof system properties}
 
-\subsection{Completeness}
+
+\newcommand{\thmsacyc}[1]{
+    \mathsf{Thm}\mathopen{}\left(#1\right)\mathclose{}
+}
+
+\begin{definition}
+    The \emph{acyclic theorems} of $\proofsysname$ are
+    $\thmsacyc{\proofsysname} = \SetBuild(s | 
+    \ \vdash_\proofsysname s)$.
+    $s$ is an \emph{acyclic theorem} of $\proofsysname$
+    if $s \in \thmsacyc{\proofsysname}$.
+\end{definition}
+
+\begin{definition}
+    System $\proofsysname = \proofsys\DomLiftable\DomRule$ 
+    \emph{acyclically admits} rule $r$ if
+    $\thmsacyc{\proofsys\DomLiftable{\DomRule \cup \set{r}}} = \thmsacyc{\proofsysname}$.
+\end{definition}
+
 
 \begin{definition}
     Suppose we have an oracle $O$ s.t.\
@@ -266,3 +335,14 @@ Normalization procedure for DAG:
 \begin{conjecture}
 If 
 \end{conjecture}
+
+\iffalse
+\subsection{Admissibility}
+
+\begin{definition}
+    Consider a proof system with a set of rules $\DomRule$.
+    A rule with premises $S_i$ and conclusion $C$ 
+    is \emph{acyclically admissible} w.r.t.\ $\DomRule$ if
+    $\forall i.\ \DER S_i \implies \DER C$.
+\end{definition}
+\fi
