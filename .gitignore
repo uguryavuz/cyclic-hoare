@@ -28,3 +28,5 @@ Makefile.coq.conf
 *.out
 *.synctex.gz
 *.pdf
+
+_opam
