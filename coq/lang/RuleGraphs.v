@@ -114,17 +114,17 @@ Definition proj_into_subdom
   exist (fun e' => In e' (remove e dom)) (proj1_sig e') 
     (@remove_2 dom e (proj1_sig e') H (proj2_sig e')).
 
-Module Type RuleGraphParams.
+Module Type ProofSystem.
   Parameter stmt : Type.
   Parameter liftable : stmt -> Prop.
   Parameter valid_stmt : stmt -> Prop.
   Parameter rule : Type.
   Parameter valid_rule : rule -> list stmt -> stmt -> Prop.
-End RuleGraphParams.
+End ProofSystem.
 
-Module RuleGraph(RGP : RuleGraphParams).
+Module RuleGraph(PS : ProofSystem).
 
-Include RGP.
+Include PS.
 
 Definition sound_rule (r : rule) : Prop :=
   forall (prems : list stmt) (conc : stmt),
@@ -1241,44 +1241,5 @@ End RuleGraphInstance.
 Definition derives rg s :=
   graph_lift_valid rg /\
   exists nd, @rg_conc rg nd = s.
-
-Definition derivable s :=
-  exists rg, derives rg s.
-
-(* A statement is valid if 
-   a graph exists where 
-   1. all lifted statements in the graph are valid
-   2. all rules used in the graph are locally sound
-   3. the statement exists somewhere in the graph
-*)
-Theorem sound_from_acyclic_graph :
-  forall (s:stmt),
-  (exists rg, 
-    derives rg s /\ 
-    ~ cyclic rg /\
-    rules_in_graph_sound rg
-  ) ->
-  valid_stmt s.
-Proof.
-  intros. exists* H.
-  destruct H. destruct H2.
-  rewrite <- H2.
-  apply~ acyclic_soundness.
-Qed.
-
-
-Definition relatively_complete :=
-  forall (s : stmt),
-  valid_stmt s ->
-  exists rg,
-  derives rg s /\ rules_in_graph_sound rg.
-
-
-Definition relatively_complete_acyclic :=
-  forall (s : stmt),
-  valid_stmt s ->
-  exists rg,
-  derives rg s /\ rules_in_graph_sound rg /\ 
-  ~ cyclic rg.
 
 End RuleGraph.

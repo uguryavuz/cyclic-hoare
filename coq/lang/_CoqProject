@@ -9,4 +9,5 @@ Assertions.v
 # TriplesMeta.v
 Examples.v
 RuleGraphs.v
+PSProperties.v
 UnaryHLGraphs.v
