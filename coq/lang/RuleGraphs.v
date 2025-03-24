@@ -1,130 +1,27 @@
 Set Implicit Arguments.
-From Lang Require Import Util.
-From Coq Require Import Structures.OrderedTypeEx.
-From Coq Require FSetList FSetFacts FSetProperties.
+From Lang Require Import Util Nodes.
 
-Module Node <: UsualOrderedType.
-  Include Nat_as_OT.
-End Node.
+Record universe : Type := {
+  stmt : Type;
+  valid_stmt : stmt -> Prop
+}.
 
-Notation node := Node.t.
+Record proof_system (univ : universe) : Type := mk_ps {
+  liftable : univ.(stmt) -> Prop;
+  rule : Type;
+  valid_rule : rule -> list univ.(stmt) -> univ.(stmt) -> Prop
+}.
 
-Module Import NodeSet := FSetList.Make(Node).
-Module NodeSetFacts := FSetFacts.Facts(NodeSet).
-Module NodeSetProperties := FSetProperties.Properties(NodeSet).
+Section RuleGraph.
 
-Section Nodes.
+Variable univ : universe.
+Variable ps : proof_system univ.
 
-Variable dom : NodeSet.t.
-
-Definition dommem := {nd | NodeSet.In nd dom}.
-
-Definition nodelist := list dommem.
-
-Lemma nodelist_pigeon : 
-  forall (l : nodelist),
-  length l > cardinal dom ->
-  ~ List.NoDup l.
-Proof.
-  intros. intro.
-  assert (List.incl 
-    (List.map (@proj1_sig elt (fun nd => NodeSet.In nd dom)) l) 
-    (elements dom)
-  ). {
-    unfolds. intros. sort.
-    apply List.in_map_iff in H1.
-    exists* H1. destruct x. simpls. subst.
-    dup_hyp i.
-    rewrite NodeSetFacts.elements_iff in i0.
-    apply SetoidList.InA_alt in i0. exists* i0.
-    now subst.
-  }
-  apply (List.NoDup_incl_length) in H1.
-  { rewrite cardinal_1 in *.
-    rewrite List.map_length in H1.
-    rewrite length_datatypes_length in H.
-    contradict H. now rewrite ngt_as_le. }
-  destruct l.
-  { simpls. apply List.NoDup_nil. }
-  apply List.NoDup_cons.
-  { intro. simpls.
-    apply List.NoDup_cons_iff in H0 as (?&?).
-    contradict H0.
-    apply List.in_map_iff in H2. exists* H2.
-    apply eq_sig_hprop in H2. subst~.
-    intros. apply proof_irrelevance. }
-  apply nodup_inj.
-  2: { now apply List.NoDup_cons_iff in H0 as (?&?). }
-  unfolds. intros.
-  apply eq_sig_hprop; auto.
-  intros. apply proof_irrelevance.
-Qed.
-
-Lemma nodelist_pigeon' : 
-  forall (l : nodelist),
-  List.NoDup l ->
-  length l <= cardinal dom.
-Proof.
-  intros. contra H.
-  apply nodelist_pigeon. math.
-Qed.
-
-Fact nodelist_all_elems :
-  forall (l : nodelist),
-  length l = cardinal dom ->
-  List.NoDup l ->
-  forall (x:dommem),
-  List.In x l.
-Proof.
-  intros. destruct x as (e&Ie). sort.
-  rewrite cardinal_1 in H.
-  assert (List.incl (elements dom)
-    (List.map (@proj1_sig elt (fun nd => NodeSet.In nd dom)) l)).
-  {
-    apply List.NoDup_length_incl.
-    - apply nodup_inj; auto.
-      unfolds. intros.
-      apply eq_sig_hprop in H1. subst~.
-      intros. apply proof_irrelevance.
-    - rewrite <- H, List.map_length, length_datatypes_length.
-      auto.
-    - unfolds. intros. sort.
-      apply List.in_map_iff in H1.
-      exists* H1. destruct x. simpls. subst.
-      dup_hyp i.
-      rewrite NodeSetFacts.elements_iff in i0.
-      apply SetoidList.InA_alt in i0. exists* i0.
-      now subst.
-  }
-  specializes H1 e. specializes H1.
-  { apply elements_1 in Ie.
-    apply SetoidList.InA_alt in Ie.
-    exists* Ie. subst~. }
-  apply List.in_map_iff in H1.
-  exists* H1. destruct x. simpls.
-  subst. replace Ie with i.
-  auto. apply proof_irrelevance.
-Qed.
-
-End Nodes.
-
-Definition proj_into_subdom
-  (dom:t) (e:elt) (e':dommem dom) (H:e <> proj1_sig e') : 
-    dommem (remove e dom) :=
-  exist (fun e' => In e' (remove e dom)) (proj1_sig e') 
-    (@remove_2 dom e (proj1_sig e') H (proj2_sig e')).
-
-Module Type RuleGraphParams.
-  Parameter stmt : Type.
-  Parameter liftable : stmt -> Prop.
-  Parameter valid_stmt : stmt -> Prop.
-  Parameter rule : Type.
-  Parameter valid_rule : rule -> list stmt -> stmt -> Prop.
-End RuleGraphParams.
-
-Module RuleGraph(RGP : RuleGraphParams).
-
-Include RGP.
+Notation stmt := univ.(stmt).
+Notation valid_stmt := univ.(valid_stmt).
+Notation rule := ps.(rule).
+Notation liftable := ps.(liftable).
+Notation valid_rule := ps.(valid_rule).
 
 Definition sound_rule (r : rule) : Prop :=
   forall (prems : list stmt) (conc : stmt),
@@ -136,7 +33,7 @@ Variant rule_or_lift : Type :=
   | Rule (r : rule) 
   | Lift.
 
-Inductive rule_graph : Type := {
+Inductive rule_graph : Type := mk_rg {
   rg_nodes : NodeSet.t;
   rg_node  : Type := {nd | NodeSet.In nd rg_nodes};
   rg_conc  : rg_node -> stmt;
@@ -559,7 +456,7 @@ Qed.
 Fact path_longer_than_card_has_dupes :
   forall (p : path),
     let nodelist := proj1_sig p in 
-      length nodelist > cardinal rg.(rg_nodes) ->
+      length nodelist > NodeSet.cardinal rg.(rg_nodes) ->
       ~ List.NoDup nodelist.
 Proof.
   intros. now apply nodelist_pigeon.
@@ -890,13 +787,13 @@ Definition longest_path (H : ~ cyclic) : path :=
 
 Lemma cyclic_cardinal :
   cyclic <-> exists (p:path),
-  length (proj1_sig p) > cardinal (rg_nodes rg).
+  length (proj1_sig p) > NodeSet.cardinal (rg_nodes rg).
 Proof.
   splits; intros.
   - destruct H as (p&LN&Dup&?).
-    pose proof iterated_looping_nodelist_length LN (S (cardinal (rg_nodes rg))).
+    pose proof iterated_looping_nodelist_length LN (S (NodeSet.cardinal (rg_nodes rg))).
     assert (looping_path p) by auto.
-    pose proof iterated_looping_path_is_path H1 (S (cardinal (rg_nodes rg))).
+    pose proof iterated_looping_path_is_path H1 (S (NodeSet.cardinal (rg_nodes rg))).
     exists (exist _ _ H2). simpls.
     replace H1 with LN by apply proof_irrelevance.
     rewrite H0. remember (length (proj1_sig p)) as l.
@@ -921,7 +818,7 @@ End Cycles.
 Lemma cardinal_nonempty :
   forall (nd : rg_node),
   exists n,
-  cardinal (rg_nodes rg) = S n.
+  NodeSet.cardinal (rg_nodes rg) = S n.
 Proof.
   intros. destruct nd.
   apply Nat.neq_0_r.
@@ -1119,7 +1016,7 @@ Proof.
 Qed.
 
 Definition depth_opt (nd : rg_node) : nat? :=
-  @depth_aux (cardinal rg.(rg_nodes)) nd.
+  @depth_aux (NodeSet.cardinal rg.(rg_nodes)) nd.
 
 Lemma depth_exists :
   forall (nd : rg_node),
@@ -1241,44 +1138,5 @@ End RuleGraphInstance.
 Definition derives rg s :=
   graph_lift_valid rg /\
   exists nd, @rg_conc rg nd = s.
-
-Definition derivable s :=
-  exists rg, derives rg s.
-
-(* A statement is valid if 
-   a graph exists where 
-   1. all lifted statements in the graph are valid
-   2. all rules used in the graph are locally sound
-   3. the statement exists somewhere in the graph
-*)
-Theorem sound_from_acyclic_graph :
-  forall (s:stmt),
-  (exists rg, 
-    derives rg s /\ 
-    ~ cyclic rg /\
-    rules_in_graph_sound rg
-  ) ->
-  valid_stmt s.
-Proof.
-  intros. exists* H.
-  destruct H. destruct H2.
-  rewrite <- H2.
-  apply~ acyclic_soundness.
-Qed.
-
-
-Definition relatively_complete :=
-  forall (s : stmt),
-  valid_stmt s ->
-  exists rg,
-  derives rg s /\ rules_in_graph_sound rg.
-
-
-Definition relatively_complete_acyclic :=
-  forall (s : stmt),
-  valid_stmt s ->
-  exists rg,
-  derives rg s /\ rules_in_graph_sound rg /\ 
-  ~ cyclic rg.
 
 End RuleGraph.

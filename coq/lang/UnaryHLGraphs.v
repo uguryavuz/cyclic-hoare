@@ -1,13 +1,13 @@
 Set Implicit Arguments. 
 From Lang Require Export Assertions.
-From Lang Require Import RuleGraphs.
+From Lang Require Import RuleGraphs PSProperties.
 
 (*Implicit Type m : mem.
 Implicit Type n : int.
 Implicit Type I : binding.
 Implicit Type c : cmd.*)
 
-Module RGP <: RuleGraphParams.
+Module PS <: ProofSystem.
   
   Variant stmt_aux := 
     | StmtTriple (c:cmd) (P Q : assrt)
@@ -61,17 +61,19 @@ Module RGP <: RuleGraphParams.
         valid_rule_aux HL_WhileFalse [] (|- CWhile b c : P /\ ~b => (P /\ ~b)).
   Definition valid_rule := valid_rule_aux.
 
-End RGP.
+End PS.
 
 
-Module Import TripleGraph := RuleGraph(RGP).
+Module Import TripleGraph := RuleGraph(PS).
+Module Import UHLProperties := PSProperties(PS).
+Import RG.
 
 Notation "'|-' c ':' P '=>' Q" := 
-  (RGP.StmtTriple c P%A Q%A)
+  (PS.StmtTriple c P%A Q%A)
   (at level 50, c at next level, no associativity).
 
 Notation "'|-' P" :=
-  (RGP.StmtAssrt P%A)
+  (PS.StmtAssrt P%A)
   (at level 50, no associativity).
 
 Section Soundness.
@@ -257,8 +259,8 @@ Implicit Type nd : rg_node rg.
 Lemma form_1_rules nd P Q :
   rg_conc nd = form_1 P Q ->
   (|= P)%V ->
-  rg_rule nd = Rule RGP.HL_CSQ \/ 
-  rg_rule nd = Rule RGP.HL_WhileTrue.
+  rg_rule nd = Rule PS.HL_CSQ \/ 
+  rg_rule nd = Rule PS.HL_WhileTrue.
 Proof.
   intros Conc TautP.
   pose proof @rg_wf rg nd.
@@ -278,8 +280,8 @@ Qed.
 
 Lemma form_2_rules nd P Q :
   rg_conc nd = form_2 P Q ->
-  rg_rule nd = Rule RGP.HL_CSQ \/ 
-  rg_rule nd = Rule RGP.HL_Seq.
+  rg_rule nd = Rule PS.HL_CSQ \/ 
+  rg_rule nd = Rule PS.HL_Seq.
 Proof.
   intros Conc.
   pose proof @rg_wf rg nd.
@@ -293,7 +295,7 @@ Qed.
 
 Lemma strong_csq nd P Q c :
   rg_conc nd = |- c : P => Q ->
-  rg_rule nd = Rule RGP.HL_CSQ ->
+  rg_rule nd = Rule PS.HL_CSQ ->
   (|= P)%V ->
   exists nd' P' Q',
   (|= P')%V /\
@@ -323,7 +325,7 @@ Qed.
 
 Lemma form_1_while nd P Q :
   rg_conc nd = form_1 P Q ->
-  rg_rule nd = Rule RGP.HL_WhileTrue ->
+  rg_rule nd = Rule PS.HL_WhileTrue ->
   (|= P)%V ->
   exists nd' P' Q',
   (|= P')%V /\
@@ -341,7 +343,7 @@ Qed.
 
 Lemma form_2_seq nd P Q :
   rg_conc nd = form_2 P Q ->
-  rg_rule nd = Rule RGP.HL_Seq ->
+  rg_rule nd = Rule PS.HL_Seq ->
   (|= P)%V ->
   exists nd' P' Q',
   (|= P')%V /\
@@ -444,8 +446,7 @@ Qed.
 
 End AcyclicIncompleteness.
 
-
-Definition acyc_derivable stmt :=
+(* Definition acyc_derivable stmt :=
   exists rg,
   derives rg stmt /\ ~ cyclic rg.
 
@@ -458,4 +459,4 @@ Proof.
   induction c; intros.
   - admit.
   - unfolds.
-Abort.
+Abort. *)
