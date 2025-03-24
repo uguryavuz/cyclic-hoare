@@ -42,16 +42,16 @@ denoted $\VAL S$.
             C
         }
     \]
-    where $S_1,\dots,S_n$ and $C$ are statement patterns, i.e.\ functions which map into $\DomStmt$.
+    where $S_1,\dots,S_n$ and $C$ are statement patterns, i.e.\ functions which all map from some domain into $\DomStmt$.
     This would denote the rule (relation)
     \[
         \textsc{Rule-Name} =
         \SetBuild(
             c, \vec s \in \DomStmt \times \DomStmt^n
         |
-            \exists \vec v.\
+            {\exists \vec v.\
             c = C(\vec v) \wedge
-            \vec s = \vec S(\vec v)
+            \vec s = \vec S(\vec v)}
         ).
     \]
     \end{itemize} 
