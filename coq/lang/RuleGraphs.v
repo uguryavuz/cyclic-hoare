@@ -12,22 +12,28 @@ Record proof_system (univ : universe) : Type := mk_ps {
   valid_rule : rule -> list univ.(stmt) -> univ.(stmt) -> Prop
 }.
 
+
 Section RuleGraph.
 
 Variable univ : universe.
-Variable ps : proof_system univ.
 
 Notation stmt := univ.(stmt).
 Notation valid_stmt := univ.(valid_stmt).
+
+Definition sound_rule (valid_r : list stmt -> stmt -> Prop) :=
+  forall (prems : list stmt) (conc : stmt),
+  valid_r prems conc ->
+  List.Forall valid_stmt prems ->
+  valid_stmt conc.
+
+Variable ps : proof_system univ.
+
 Notation rule := ps.(rule).
 Notation liftable := ps.(liftable).
 Notation valid_rule := ps.(valid_rule).
 
-Definition sound_rule (r : rule) : Prop :=
-  forall (prems : list stmt) (conc : stmt),
-    valid_rule r prems conc ->
-      List.Forall valid_stmt prems ->
-      valid_stmt conc.
+Definition ps_sound_rule (r : rule) : Prop :=
+  sound_rule (valid_rule r).
 
 Variant rule_or_lift : Type :=
   | Rule (r : rule) 
@@ -55,7 +61,7 @@ Notation rg_node := rg.(rg_node).
 Definition rules_in_graph_sound :=
   forall rule, 
   (exists nd, @rg_rule rg nd = Rule rule) -> 
-  sound_rule rule.
+  ps_sound_rule rule.
 
 Definition graph_lift_valid : Prop :=
   forall (nd : rg_node), 

@@ -48,11 +48,30 @@ Proof.
   introv [rg [_ H1]]. exists~ rg.
 Qed.
 
-Definition relatively_complete :=
-  valid_stmt ⊆ theorem.
 
-Definition acyc_relatively_complete :=
-  valid_stmt ⊆ acyc_theorem.
+Definition ps_sound      := theorem ⊆ valid_stmt.
+Definition ps_acyc_sound := acyc_theorem ⊆ valid_stmt.
+
+Definition rules_in_ps_sound :=
+  forall (r : ps.(rule)),
+  ps_sound_rule ps r.
+
+Lemma acyc_sound_rules :
+  rules_in_ps_sound ->
+  ps_acyc_sound.
+Proof.
+  intros.
+  unfolds. introv ?.
+  destruct H0 as (?&?&?&?&?). subst.
+  apply~ acyclic_soundness.
+  introv ?. auto.
+Qed.
+
+
+
+Definition relatively_complete      := valid_stmt ⊆ theorem.
+Definition acyc_relatively_complete := valid_stmt ⊆ acyc_theorem.
+
 
 Lemma rel_comp_weak :
   acyc_relatively_complete -> relatively_complete.
@@ -167,12 +186,14 @@ Proof.
   intros. apply H0, H.
 Qed.
 
-Lemma acyc_admits_admits :
+(*Lemma acyc_admits_admits :
   acyc_admits -> admits.
 Proof.
   intro. unfolds acyc_admits, admits, acyc_theorem, theorem, acyc_derivable, derivable.
   introv (?&?).
 Abort.
+*)
+
 
 Lemma admits_rel_comp :
   relatively_complete extend_ps -> 
@@ -182,5 +203,24 @@ Proof.
   introv ???. specializes H H1.
   specializes H0 x. auto.
 Qed.
+
+Lemma admits_relcomp_sound :
+  acyc_relatively_complete ps ->
+  rules_in_ps_sound ps ->
+  sound_rule univ valid_r ->
+  acyc_admits.
+Proof.
+  introv RC Snd H ?.
+  unfolds in RC Snd. unfold subset in RC.
+  apply RC.
+  pose proof acyclic_soundness.
+  destruct H0 as (?&?&?&?&?). subst.
+  specializes H1 H0 H2. apply H1.
+  introv ?. unfolds.
+  destruct rule.
+  - apply Snd.
+  - apply H.
+Qed.
+
 
 End MorePSProperties.

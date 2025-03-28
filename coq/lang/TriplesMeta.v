@@ -1,5 +1,5 @@
 Set Implicit Arguments.
-From Lang Require Export Assertions.
+From Lang Require Export Assertions UnaryHLGraphs.
 
 Implicit Type m : mem.
 Implicit Type n : int.
@@ -29,7 +29,7 @@ Inductive derivable_triple : cmd -> assrt -> assrt -> Prop :=
     (H1 : |- c : P => Q) (H2 : |- c' : Q => R) :
     |- CSeq c c' : P => R
   | HL_If (b:bexp) c c' P Q
-    (H1 : |- c : P /\ b => Q) (H2 : |- c : P /\ ~ b => Q) :
+    (H1 : |- c : P /\ b => Q) (H2 : |- c' : P /\ ~ b => Q) :
     |- CIf b c c' : P => Q
   (*| HL_IfFalse (b:bexp) c c' P Q
     (H : |- c' : P /\ ~ b => Q) :
@@ -43,21 +43,20 @@ where "'|-' c ':' P '=>' Q" :=
   (derivable_triple c P%A Q%A).
 
 
-(*Theorem soundness c P Q :
+Theorem soundness c P Q :
   |- c : P => Q -> |= c : P => Q.
 Proof.
   introv H. induction H; simpls.
   - eapply csq_sound; eauto.
-  - applys case_sound IHderivable_triple1 IHderivable_triple2.
+  (*- applys case_sound IHderivable_triple1 IHderivable_triple2.*)
   - apply skip_sound. 
   - apply assn_sound.
   - eapply seq_sound; eauto.
-  - eapply if_true_sound; eauto.
-  - eapply if_false_sound; eauto.
+  - eapply if_sound; eauto.
   - eapply while_true_sound; eauto.
   - eapply while_false_sound; eauto.
 Qed.
-*)
+
 
 
 Section DerivedRules.
@@ -115,11 +114,16 @@ Proof.
 Qed.
 
 Lemma HL_Skip' P Q :
-  |= (P -> Q) ->
+  |= (P -> Q) <->
   |- CSkip : P => Q.
 Proof.
-  intros. applys HL_CSQ_L H.
+  splits; intros. applys HL_CSQ_L H.
   apply HL_Skip.
+  apply soundness in H.
+  unfolds in H. introv ?.
+  specializes H m I. unfolds in H.
+  apply~ H. unfolds.
+  exists O. constructor.
 Qed.
 
 Lemma HL_Assn' x a P Q :
@@ -199,6 +203,23 @@ Qed.
 
 End DerivedRules.
 
+
+Section Case.
+
+Local Lemma case_skip_admit P Q e :
+  |- CSkip : P /\ e => Q ->
+  |- CSkip : P /\ ~ e => Q ->
+  |- CSkip : P => Q.
+Proof.
+  intros.
+  rewrite <- HL_Skip' in H, H0.
+  apply HL_CSQ with (P':=Q) (Q':=Q); auto.
+  2: constructor.
+  introv ?. specializes H m I. specializes H0 m I.
+  simpls.
+  either (m + I |= e).
+  apply~ H. apply~ H0.
+Qed.
 
 
 (*Lemma case_admissible c :

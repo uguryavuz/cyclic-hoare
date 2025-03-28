@@ -192,7 +192,7 @@ Proof.
   unfold rules_in_graph_sound.
   intros.
   destruct H.
-  unfold sound_rule.
+  unfold ps_sound_rule, sound_rule.
   intros.
   destruct conc. 2 : inverts H0.
   unfold valid_stmt.
@@ -456,3 +456,16 @@ Proof.
   - admit.
   - unfolds.
 Abort. *)
+
+
+(*
+Section Case.
+
+
+Local Lemma skip_admit P Q b :
+  derivable uhl (|- CSkip : P /\ b => Q) ->
+  derivable uhl (|- CSkip : P /\ ~ b => Q) ->
+  derivable uhl (|- CSkip : P => Q).
+Proof.
+
+  *)
