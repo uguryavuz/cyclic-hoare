@@ -182,3 +182,5 @@ Proof.
   introv ???. specializes H H1.
   specializes H0 x. auto.
 Qed.
+
+End MorePSProperties.

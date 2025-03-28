@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 From Lang Require Import Util Nodes.
 
-Record universe : Type := {
+Record universe : Type := mk_univ {
   stmt : Type;
   valid_stmt : stmt -> Prop
 }.

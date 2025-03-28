@@ -1,30 +1,31 @@
 Set Implicit Arguments. 
 From Lang Require Export Assertions.
-From Lang Require Import RuleGraphs PSProperties.
+From Lang Require Import RuleGraphs PSProperties Nodes.
 
 (*Implicit Type m : mem.
 Implicit Type n : int.
 Implicit Type I : binding.
 Implicit Type c : cmd.*)
 
-Module PS <: ProofSystem.
-  
-  Variant stmt_aux := 
+Section PS.
+
+  Variant _stmt := 
     | StmtTriple (c:cmd) (P Q : assrt)
     | StmtAssrt (P:assrt).
-  Definition stmt := stmt_aux.
   
-  Definition liftable (s : stmt) : Prop :=
+  Definition liftable (s : _stmt) : Prop :=
     match s with 
     | StmtAssrt _ => True
     | _ => False
     end.
 
-  Definition valid_stmt (s : stmt) : Prop :=
+  Definition valid_stmt (s : _stmt) : Prop :=
     match s with 
     | StmtAssrt P => valid_assrt P
     | StmtTriple c P Q => valid_triple c P Q
     end.
+
+  Definition univ := @mk_univ _stmt valid_stmt.
 
   Notation "'|-' c ':' P '=>' Q" := 
     (StmtTriple c P%A Q%A)
@@ -34,7 +35,7 @@ Module PS <: ProofSystem.
     (StmtAssrt P%A)
     (at level 50, no associativity).
 
-  Variant rule_aux :=
+  Variant rule :=
     | HL_CSQ
     | HL_Skip
     | HL_Assn
@@ -42,38 +43,33 @@ Module PS <: ProofSystem.
     | HL_If
     | HL_WhileTrue
     | HL_WhileFalse.
-  Definition rule := rule_aux.
 
-  Variant valid_rule_aux : rule -> list stmt -> stmt -> Prop :=
+  Variant valid_rule : rule -> list _stmt -> _stmt -> Prop :=
     | Valid_HL_CSQ c P P' Q Q' : 
-        valid_rule_aux HL_CSQ [(|- (P->P')); (|- c : P' => Q'); (|- (Q'->Q))] (|- c : P => Q)
+      valid_rule HL_CSQ [(|- (P->P')); (|- c : P' => Q'); (|- (Q'->Q))] (|- c : P => Q)
     | Valid_HL_Skip P : 
-        valid_rule_aux HL_Skip [] (|- CSkip : P => P)
+      valid_rule HL_Skip [] (|- CSkip : P => P)
     | Valid_HL_Assn x a P : 
-        valid_rule_aux HL_Assn [] (|- CAssn x a : P[a/x] => P)
+      valid_rule HL_Assn [] (|- CAssn x a : P[a/x] => P)
     | Valid_HL_Seq c1 c2 P Q R : 
-        valid_rule_aux HL_Seq [(|- c1 : P => Q); (|- c2 : Q => R)] (|- CSeq c1 c2 : P => R)
+      valid_rule HL_Seq [(|- c1 : P => Q); (|- c2 : Q => R)] (|- CSeq c1 c2 : P => R)
     | Valid_HL_If c P Q (b:bexp) c' : 
-        valid_rule_aux HL_If [(|- c : P /\ b => Q); (|- c' : P /\ ~b => Q)] (|- CIf b c c' : P => Q)
+      valid_rule HL_If [(|- c : P /\ b => Q); (|- c' : P /\ ~b => Q)] (|- CIf b c c' : P => Q)
     | Valid_HL_WhileTrue c P Q (b:bexp) : 
-        valid_rule_aux HL_WhileTrue [(|- CSeq c (CWhile b c) : P /\ b => Q)] (|- CWhile b c : P /\ b => (Q /\ ~b))
+      valid_rule HL_WhileTrue [(|- CSeq c (CWhile b c) : P /\ b => Q)] (|- CWhile b c : P /\ b => (Q /\ ~b))
     | Valid_HL_WhileFalse P b c : 
-        valid_rule_aux HL_WhileFalse [] (|- CWhile b c : P /\ ~b => (P /\ ~b)).
-  Definition valid_rule := valid_rule_aux.
+      valid_rule HL_WhileFalse [] (|- CWhile b c : P /\ ~b => (P /\ ~b)).
+
+  Definition uhl := @mk_ps univ liftable rule valid_rule.
 
 End PS.
 
-
-Module Import TripleGraph := RuleGraph(PS).
-Module Import UHLProperties := PSProperties(PS).
-Import RG.
-
 Notation "'|-' c ':' P '=>' Q" := 
-  (PS.StmtTriple c P%A Q%A)
+  (StmtTriple c P%A Q%A)
   (at level 50, c at next level, no associativity).
 
 Notation "'|-' P" :=
-  (PS.StmtAssrt P%A)
+  (StmtAssrt P%A)
   (at level 50, no associativity).
 
 Section Soundness.
@@ -189,8 +185,8 @@ Proof.
   trivial.
 Qed.
 
-Theorem hl_sound :
-  forall (rg : rule_graph), rules_in_graph_sound rg.
+Theorem uhl_sound :
+  forall (rg : rule_graph uhl), rules_in_graph_sound rg.
 Proof.
   intro.
   unfold rules_in_graph_sound.
@@ -244,7 +240,7 @@ Qed.
 
 Section GraphFacts.
 
-Variable rg : rule_graph.
+Variable rg : rule_graph uhl.
 Variable lift_valid : graph_lift_valid rg.
 Variable acyclic : ~ cyclic rg.
 
@@ -259,11 +255,11 @@ Implicit Type nd : rg_node rg.
 Lemma form_1_rules nd P Q :
   rg_conc nd = form_1 P Q ->
   (|= P)%V ->
-  rg_rule nd = Rule PS.HL_CSQ \/ 
-  rg_rule nd = Rule PS.HL_WhileTrue.
+  rg_rule nd = Rule uhl HL_CSQ \/ 
+  rg_rule nd = Rule uhl HL_WhileTrue.
 Proof.
   intros Conc TautP.
-  pose proof @rg_wf rg nd.
+  pose proof rg_wf nd.
   destruct (rg_rule nd) eqn:R.
   2: { 
     destruct H. unfolds in H. rewrite Conc in H.
@@ -280,11 +276,11 @@ Qed.
 
 Lemma form_2_rules nd P Q :
   rg_conc nd = form_2 P Q ->
-  rg_rule nd = Rule PS.HL_CSQ \/ 
-  rg_rule nd = Rule PS.HL_Seq.
+  rg_rule nd = Rule uhl HL_CSQ \/ 
+  rg_rule nd = Rule uhl HL_Seq.
 Proof.
   intros Conc.
-  pose proof @rg_wf rg nd.
+  pose proof rg_wf nd.
   destruct (rg_rule nd) eqn:R.
   2: { 
     destruct H. unfolds in H. now rewrite Conc in H.
@@ -295,11 +291,11 @@ Qed.
 
 Lemma strong_csq nd P Q c :
   rg_conc nd = |- c : P => Q ->
-  rg_rule nd = Rule PS.HL_CSQ ->
+  rg_rule nd = Rule uhl HL_CSQ ->
   (|= P)%V ->
   exists nd' P' Q',
   (|= P')%V /\
-  rg_conc nd' = |- c : P' => Q' /\
+  rg_conc nd' = (StmtTriple c P' Q' : univ.(stmt)) /\
   List.In nd' (rg_prems nd).
 Proof.
   intros Conc Rule TautP.
@@ -325,11 +321,11 @@ Qed.
 
 Lemma form_1_while nd P Q :
   rg_conc nd = form_1 P Q ->
-  rg_rule nd = Rule PS.HL_WhileTrue ->
+  rg_rule nd = Rule uhl HL_WhileTrue ->
   (|= P)%V ->
   exists nd' P' Q',
   (|= P')%V /\
-  rg_conc nd' = form_2 P' Q' /\
+  rg_conc nd' = (form_2 P' Q' : univ.(stmt)) /\
   List.In nd' (rg_prems nd).
 Proof.
   intros F Rule HP.
@@ -343,11 +339,11 @@ Qed.
 
 Lemma form_2_seq nd P Q :
   rg_conc nd = form_2 P Q ->
-  rg_rule nd = Rule PS.HL_Seq ->
+  rg_rule nd = Rule uhl HL_Seq ->
   (|= P)%V ->
   exists nd' P' Q',
   (|= P')%V /\
-  rg_conc nd' = form_1 P' Q' /\
+  rg_conc nd' = (form_1 P' Q' : univ.(stmt)) /\
   List.In nd' (rg_prems nd).
 Proof.
   intros F Rule HP.
@@ -362,7 +358,7 @@ Proof.
   2: { right. constructor~. }
 
   pose proof rg_wf r. rewrite <- H2 in H.
-  pose proof acyclic_soundness acyclic lift_valid (@hl_sound rg) r.
+  pose proof acyclic_soundness acyclic lift_valid (@uhl_sound rg) r.
   rewrite <- H2 in H1. unfolds in H1.
   simpls. introv.
   specializes HP m I. specializes H1 HP m.
@@ -430,14 +426,14 @@ End GraphFacts.
 
 
 Theorem unary_HL_acyclic_incomplete :
-  ~ relatively_complete_acyclic.
+  ~ acyc_relatively_complete uhl.
 Proof.
-  unfolds relatively_complete_acyclic.
+  unfolds acyc_relatively_complete.
   intro. specializes H (|- (CWhile true CSkip) : true => false).
   specializes H infinite_loop_valid.
-  destruct H as (rg&(Lft&nd&Conc)&Snd&Acyclic).
-  pose proof @path_grow _ Lft Acyclic nd true false.
-  contradict Acyclic. apply cyclic_cardinal.
+  destruct H as (rg&Acyc&(Lft&nd&Conc)).
+  pose proof @path_grow _ Lft Acyc nd true false.
+  contradict Acyc. apply cyclic_cardinal.
   specializes H (NodeSet.cardinal (rg_nodes rg)); try easy.
   { unfolds. left. now rewrite Conc. }
   destruct H as (_&_&_&p&_&_&_&_&L).
