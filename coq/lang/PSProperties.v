@@ -38,19 +38,6 @@ Proof.
   apply~ acyclic_soundness.
 Qed.
 
-Definition relatively_complete :=
-  forall (s : stmt),
-  valid_stmt s ->
-  exists (rg : rule_graph ps),
-  derives rg s /\ rules_in_graph_sound rg.
-
-
-Definition relatively_complete_acyclic :=
-  forall (s : stmt),
-  valid_stmt s ->
-  exists (rg : rule_graph ps),
-  derives rg s /\ rules_in_graph_sound rg /\ 
-  ~ cyclic rg.
 
 Definition theorem := derivable.
 Definition acyc_theorem := acyc_derivable.
@@ -59,6 +46,19 @@ Lemma acyc_thm_is_theorem :
   acyc_theorem ⊆ theorem.
 Proof.
   introv [rg [_ H1]]. exists~ rg.
+Qed.
+
+Definition relatively_complete :=
+  valid_stmt ⊆ theorem.
+
+Definition acyc_relatively_complete :=
+  valid_stmt ⊆ acyc_theorem.
+
+Lemma rel_comp_weak :
+  acyc_relatively_complete -> relatively_complete.
+Proof.
+  introv ??. specializes H H0.
+  apply~ acyc_thm_is_theorem.
 Qed.
 
 Section ExtendPSProperties.
@@ -132,8 +132,10 @@ Variable r : Type.
 Variable r_inhab : Inhab r.
 Variable valid_r : list stmt -> stmt -> Prop.
 
+Notation extend_ps := (extend_ps ps r valid_r).
+
 Lemma thm_extend_mono :
-  theorem ps ⊆ theorem (extend_ps ps r valid_r).
+  theorem ps ⊆ theorem extend_ps.
 Proof.
   introv [rg H1].
   unfold theorem.
@@ -143,7 +145,7 @@ Proof.
 Qed.
 
 Lemma acyc_thm_extend_mono :
-  acyc_theorem ps ⊆ acyc_theorem (extend_ps ps r valid_r).
+  acyc_theorem ps ⊆ acyc_theorem extend_ps.
 Proof.
   introv [rg [H1 H2]].
   exists (extend_rg r valid_r rg).
@@ -151,47 +153,32 @@ Proof.
 Qed.
 
 Definition admits := 
-  theorem (extend_ps ps r valid_r) ⊆ theorem ps.
+  theorem extend_ps ⊆ theorem ps.
 
 Definition acyc_admits := 
-  acyc_theorem (extend_ps ps r valid_r) ⊆ acyc_theorem ps.
+  acyc_theorem extend_ps ⊆ acyc_theorem ps.
 
-Lemma admits_characteristic :
-  (forall (prems : list stmt) (conc : stmt),
-    valid_rule (extend_ps ps r valid_r) (inr (arbitrary r_inhab)) prems conc ->
-      List.Forall (derivable ps) prems ->
-      (derivable ps) conc)
-  <-> admits.
+
+Lemma admits_derives s :
+  derivable extend_ps s ->
+  admits ->
+  derivable ps s.
 Proof.
-  split. {
-    intros.
-    unfold admits.
-    introv [rg [H1 H2]].
-    unfold theorem.
-    (* Print extend_ps. *)
-    exists* H2.
-    specializes H (List.map rg.(rg_conc) (rg.(rg_prems) nd)) x.
-    apply H.
-    + simpls.
-      remember (extend_ps ps r valid_r) as ext.
-      pose (ext.(valid_rule)).
-      subst.
-      unfolds extend_ps. simpls.
-      specializes P (inr (arbitrary r_inhab)).
-      unfolds 
-    unfolds extend_ps. simpls.
-    specializes H (List.map rg.(rg_conc) (rg.(rg_prems) nd)) x.
-    apply H.
-    + pose proof (H3 : ps.(valid_rule)). destruct rg. simpls.
-    
-    
-     destruct arbitrary. unfold r_inhab.
-    unfold derivable.
-    unfold derives.
-    destruct rg. simpls.
-    auto.
-  }
+  intros. apply H0, H.
 Qed.
 
+Lemma acyc_admits_admits :
+  acyc_admits -> admits.
+Proof.
+  intro. unfolds acyc_admits, admits, acyc_theorem, theorem, acyc_derivable, derivable.
+  introv (?&?).
+Abort.
 
-(* Lemma admits_characteristic : locally_sound (derivable ps) ->  *)
+Lemma admits_rel_comp :
+  relatively_complete extend_ps -> 
+  admits ->
+  relatively_complete ps.
+Proof.
+  introv ???. specializes H H1.
+  specializes H0 x. auto.
+Qed.
