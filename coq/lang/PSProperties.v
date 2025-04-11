@@ -11,6 +11,14 @@ Notation valid_stmt := univ.(valid_stmt).
 Implicit Type s : stmt.
 Implicit Type rg : rule_graph ps.
 
+
+Definition rule_entails (valid_r : list stmt -> stmt -> Prop) P :=
+  forall (prems : list stmt) (conc : stmt),
+  valid_r prems conc ->
+  List.Forall P prems ->
+  P conc.
+
+
 Definition derivable s :=
   exists (rg : rule_graph ps), derives rg s.
 
@@ -221,6 +229,30 @@ Proof.
   - apply Snd.
   - apply H.
 Qed.
+
+Lemma acyc_admits_char_is_char :
+  rule_entails univ valid_r (acyc_derivable ps) <->
+  acyc_admits.
+Proof.
+split; intro.
+{
+  introv ?.
+  admit.
+}
+{
+  introv ??.
+  unfolds in H.
+  apply H.
+  rewrite List.Forall_forall in H1.
+}
+Abort.
+
+
+Lemma cyc_admits_char_weak :
+  rule_entails univ valid_r (derivable ps) ->
+  acyc_theorem extend_ps ⊆ theorem ps.
+Proof.
+Abort.
 
 
 End MorePSProperties.

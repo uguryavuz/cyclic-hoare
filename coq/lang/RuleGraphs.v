@@ -1145,4 +1145,20 @@ Definition derives rg s :=
   graph_lift_valid rg /\
   exists nd, @rg_conc rg nd = s.
 
+
+
+Section Composition.
+
+Definition combine (rg0 rg1 : rule_graph) : rule_graph.
+destruct rg0, rg1. Locate "set".
+pose () as rg_nodes.
+
+
+Search NodeSet.t.
+
+
+End Composition.
+
+
+
 End RuleGraph.
