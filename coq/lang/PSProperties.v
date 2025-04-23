@@ -230,7 +230,7 @@ Proof.
   - apply H.
 Qed.
 
-Lemma acyc_admits_char_is_char :
+(* Lemma acyc_admits_char_is_char :
   rule_entails univ valid_r (acyc_derivable ps) <->
   acyc_admits.
 Proof.
@@ -252,7 +252,7 @@ Lemma cyc_admits_char_weak :
   rule_entails univ valid_r (derivable ps) ->
   acyc_theorem extend_ps ⊆ theorem ps.
 Proof.
-Abort.
+Abort. *)
 
 
 End MorePSProperties.

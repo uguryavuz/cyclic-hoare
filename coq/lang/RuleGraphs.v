@@ -832,12 +832,11 @@ Proof.
   now specializes H i.
 Qed.
 
+Notation is_prem prem nd := (List.In prem (rg_prems nd)).
 
 Section Depth.
 
 Variable A : ~ cyclic.
-
-Notation is_prem prem nd := (List.In prem (rg_prems nd)).
 
 Definition max_option (a b : nat?) : nat? :=
   match a, b with
@@ -1144,21 +1143,5 @@ End RuleGraphInstance.
 Definition derives rg s :=
   graph_lift_valid rg /\
   exists nd, @rg_conc rg nd = s.
-
-
-
-Section Composition.
-
-Definition combine (rg0 rg1 : rule_graph) : rule_graph.
-destruct rg0, rg1. Locate "set".
-pose () as rg_nodes.
-
-
-Search NodeSet.t.
-
-
-End Composition.
-
-
 
 End RuleGraph.

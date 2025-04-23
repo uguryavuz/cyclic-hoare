@@ -424,7 +424,6 @@ Qed.
 
 End GraphFacts.
 
-
 Theorem unary_HL_acyclic_incomplete :
   ~ acyc_relatively_complete uhl.
 Proof.
@@ -442,30 +441,171 @@ Qed.
 
 End AcyclicIncompleteness.
 
-(* Definition acyc_derivable stmt :=
-  exists rg,
-  derives rg stmt /\ ~ cyclic rg.
+Section CyclicTraceRules.
 
-Lemma case_admissible c :
-  forall e P Q,
-  acyc_derivable (|- c : P /\ e => Q) ->
-  acyc_derivable (|- c : P /\ ~ e => Q) ->
-  acyc_derivable (|- c : P => Q).
+Open Scope valid_scope.
+
+Definition invalid_triple c P Q n :=
+  exists m I, 
+    (m+I |= P)%V /\ 
+    exists m' n',
+      multistep c m CSkip m' n' /\ 
+      ~ (m'+I |= Q)%V /\
+      n' < n.
+
+Lemma while_true_trace_rule b c P Q n :
+  invalid_triple (CWhile b c) (P /\ b)%A (Q /\ ~b)%A (S n) ->
+  invalid_triple (CSeq c (CWhile b c)) (P /\ b)%A (Q)%A n.
 Proof.
-  induction c; intros.
-  - admit.
-  - unfolds.
-Abort. *)
+  intro.
+  unfold invalid_triple in *.
+  exists* H.
+  apply while_multistep_termination in H0 as H4.
+  inverts H0.
+  sort.
+  inverts H3.
+  2 : {
+    simpls.
+    contradict Hg.
+    destruct H.
+    applys bexp_assrt_equiv.
+    applys H0.
+  }
+  exists m'0 I.
+  splits~.
+  exists m' n0.
+  splits~.
+  2 : math.
+  contra H1.
+  simpls.
+  splits~.
+  contra H4.
+  now apply bexp_assrt_equiv in H4.
+Qed.
 
-
-(*
-Section Case.
-
-
-Local Lemma skip_admit P Q b :
-  derivable uhl (|- CSkip : P /\ b => Q) ->
-  derivable uhl (|- CSkip : P /\ ~ b => Q) ->
-  derivable uhl (|- CSkip : P => Q).
+Lemma if_trace_rule b c c' P Q n :
+  invalid_triple (CIf b c c') P Q (S n) ->
+  invalid_triple c (P /\ b)%A Q n \/ invalid_triple c' (P /\ ~b)%A Q n.
 Proof.
+  intro.
+  unfold invalid_triple in H.
+  exists* H.
+  inverts H0.
+  inverts H3.
+  - left.
+    unfold invalid_triple.
+    exists m'0 I.
+    split.
+    simpls.
+    splits~.
+    now rewrite bexp_assrt_equiv.
+    exists m' n0.
+    splits~. 
+    math. 
+  - right.
+    unfold invalid_triple.
+    exists m'0 I.
+    split.
+    simpls.
+    splits~.
+    now rewrite bexp_assrt_equiv.
+    exists m' n0.
+    splits~. 
+    math.
+Qed.
 
-  *)
+Lemma seq_trace_rule c c' P Q R n :
+  invalid_triple (CSeq c c') P R (S n) ->
+    invalid_triple c P Q n \/ invalid_triple c' Q R n.
+Proof.
+  intro.
+  unfold invalid_triple in H.
+  exists* H.
+  apply seq_intermediate_multistep in H0.
+  exists* H0.
+  either (m'0 + I |= Q)%V.
+  - right.
+    unfold invalid_triple.
+    exists m'0 I.
+    splits~.
+    exists m' n2.
+    splits~.
+    math.
+  - left.
+    unfold invalid_triple.
+    exists m I.
+    splits~.
+    exists m'0 n1.
+    splits~.
+    math.
+Qed.
+
+Lemma csq_trace_rule c P Q P' Q' 
+  (H1 : |= (P -> P')) (H3 : |= (Q' -> Q)) n :
+  invalid_triple c P Q n ->
+  invalid_triple c P' Q' n.
+Proof.
+  intro.
+  unfold invalid_triple in *.
+  exists* H.
+  exists m I.
+  split.
+  apply H1, H.
+  exists m' n'.
+  splits~.
+  contra H2.
+  now apply H3.
+Qed.
+
+Lemma case_trace_rule c b P Q n :
+  invalid_triple c P Q n ->
+    invalid_triple c (P /\ b)%A Q n \/ invalid_triple c (P /\ ~b)%A Q n.
+Proof.
+  intro.
+  unfold invalid_triple in H.
+  exists* H.
+  either (m + I |= b)%V.
+  - left.
+    unfold invalid_triple.
+    exists m I.
+    splits~.
+    simpls~.
+    exists m' n'.
+    splits~.
+  - right.
+    unfold invalid_triple.
+    exists m I.
+    splits~.
+    simpls~.
+    exists m' n'.
+    splits~.
+Qed.
+
+End CyclicTraceRules.
+
+Section InfiniteInvalid.
+
+Variable rg : rule_graph uhl.
+Variable lift_valid : graph_lift_valid rg.
+
+Definition invalid_stmt s n : Prop :=
+  match s with 
+  | StmtAssrt P => ~ (valid_assrt P)
+  | StmtTriple c P Q => invalid_triple c P Q n
+  end.
+
+(* Locate is_prem.
+
+Lemma invalid_stmt_has_invalid_prem :
+  forall nd n,
+    invalid_stmt (rg.(rg_conc) nd) n ->
+    exists prem,
+      is_prem prem nd /\ invalid_stmt (rg.(rg_conc) prem) n.
+
+
+
+
+
+Locate derives.  *)
+
+End InfiniteInvalid.
