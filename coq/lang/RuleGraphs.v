@@ -832,7 +832,7 @@ Proof.
   now specializes H i.
 Qed.
 
-Notation is_prem prem nd := (List.In prem (rg_prems nd)).
+Definition is_prem prem nd := (List.In prem (@rg_prems rg nd)).
 
 Section Depth.
 

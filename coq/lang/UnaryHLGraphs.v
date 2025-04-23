@@ -453,6 +453,46 @@ Definition invalid_triple c P Q n :=
       ~ (m'+I |= Q)%V /\
       n' < n.
 
+Lemma invalid_triple_is_not_valid c P Q :
+  (exists n, invalid_triple c P Q n) <->
+  ~ (|= c : P => Q).
+Proof.
+  split.
+  - intro.
+    exists* H.
+    unfold valid_triple.
+    intro.
+    unfold invalid_triple in H.
+    exists* H.
+    specializes H0 H m'.
+    contradict H2.
+    apply H0.
+    unfolds.
+    exists~ n'.
+  - intro.
+    unfold valid_triple in H.
+    rewrite not_forall_eq in H.
+    exists* H.
+    rewrite not_forall_eq in H.
+    exists* H.
+    unfold triple in H.
+    apply imply_to_and in H.
+    destruct H.
+    rewrite not_forall_eq in H0.
+    exists* H0.
+    apply imply_to_and in H0.
+    destruct H0.
+    unfold yields in H0.
+    exists* H0.
+    exists (S n).
+    unfold invalid_triple.
+    exists x x0.
+    splits~.
+    exists x1 n.
+    splits~.
+    math.
+Qed.
+
 Lemma while_true_trace_rule b c P Q n :
   invalid_triple (CWhile b c) (P /\ b)%A (Q /\ ~b)%A (S n) ->
   invalid_triple (CSeq c (CWhile b c)) (P /\ b)%A (Q)%A n.
@@ -594,18 +634,228 @@ Definition invalid_stmt s n : Prop :=
   | StmtTriple c P Q => invalid_triple c P Q n
   end.
 
-(* Locate is_prem.
-
 Lemma invalid_stmt_has_invalid_prem :
   forall nd n,
     invalid_stmt (rg.(rg_conc) nd) n ->
     exists prem,
       is_prem prem nd /\ invalid_stmt (rg.(rg_conc) prem) n.
+Proof.
+  intros.
+  pose proof (rg.(rg_wf) nd) as H0.
+  destruct (rg.(rg_rule) nd) eqn:Heq.
+  2 : {
+    simpls.
+    destruct H0.
+    specializes lift_valid nd.
+    rewrite Heq in lift_valid.
+    simpls.
+    destruct (rg_conc nd).
+    contradiction.
+    unfold invalid_stmt in H.
+    unfold valid_stmt in lift_valid.
+    contradiction.
+  }
+  simpls.
+  destruct r; inverts H0.
+  - unfold is_prem.
+    destruct (rg_prems nd).
+    discriminate.
+    simpls.
+    injects H1.
+    destruct l.
+    discriminate.
+    simpls.
+    injects TEMP.
+    exists r0.
+    splits~. 
+    destruct l.
+    discriminate.
+    simpls.
+    injects TEMP1.
+    clear TEMP.
+    rewrite <- TEMP2.
+    simpls.
+    applys csq_trace_rule P Q.
+    + specializes lift_valid r.
+      pose proof (rg_wf r).
+      destruct (rg_rule r).
+      simpls.
+      rewrite <- TEMP0 in H0.
+      inverts H0.
+      simpls.
+      rewrite <- TEMP0 in lift_valid.
+      simpls~.
+    + specializes lift_valid r1.
+      pose proof (rg_wf r1).
+      destruct (rg_rule r1).
+      simpls.
+      rewrite <- TEMP3 in H0.
+      inverts H0.
+      simpls.
+      rewrite <- TEMP3 in lift_valid.
+      simpls~.
+    + rewrite <- H2 in H.
+      simpls~.
+  - rewrite <- H2 in H.
+    unfold invalid_stmt in H.
+    assert (H3 : exists n', invalid_triple CSkip P P n') by (exists~ n).
+    rewrite invalid_triple_is_not_valid in H3.
+    contradict H3.
+    apply skip_sound.
+  - rewrite <- H2 in H.
+    unfold invalid_stmt in H.
+    assert (H3 : exists n', invalid_triple (CAssn x a) (P [a / x])%A P n') by (exists~ n).
+    rewrite invalid_triple_is_not_valid in H3.
+    contradict H3.
+    apply assn_sound.
+  - unfold is_prem.
+    destruct (rg_prems nd).
+    discriminate.
+    simpls.
+    injects H1.
+    destruct l.
+    discriminate.
+    simpls.
+    injects TEMP.
+    clear TEMP1.
+    rewrite <- H2 in H. 
+    simpls.
+    destruct n.
+    { unfolds in H. 
+      exists* H.
+      math. }
+    apply seq_trace_rule with (Q:=Q) in H.
+    destruct H.
+    + exists r.
+      splits~.
+      rewrite <- TEMP0.
+      simpls.
+      unfold invalid_triple in *.
+      exists* H.
+      exists m I.
+      splits~.
+      exists m' n'.
+      splits~.
+      math.
+    + exists r0.
+      splits~.
+      rewrite <- TEMP2.
+      simpls.
+      unfold invalid_triple in *.
+      exists* H.
+      exists m I.
+      splits~.
+      exists m' n'.
+      splits~.
+      math.
+  - unfold is_prem.
+    destruct (rg_prems nd).
+    discriminate.
+    simpls.
+    injects H1.
+    destruct l.
+    discriminate.
+    simpls.
+    injects TEMP.
+    clear TEMP1.
+    rewrite <- H2 in H. 
+    simpls.
+    destruct n.
+    { unfolds in H. 
+      exists* H.
+      math. }
+    apply if_trace_rule in H.
+    destruct H.
+    + exists r.
+      splits~.
+      rewrite <- TEMP0.
+      simpls.
+      unfold invalid_triple in *.
+      exists* H.
+      exists m I.
+      splits~.
+      exists m' n'.
+      splits~.
+      math.
+    + exists r0.
+      splits~.
+      rewrite <- TEMP2.
+      simpls.
+      unfold invalid_triple in *.
+      exists* H.
+      exists m I.
+      splits~.
+      exists m' n'.
+      splits~.
+      math.
+  - unfold is_prem.
+    destruct (rg_prems nd).
+    discriminate.
+    simpls.
+    injects H1.
+    clear TEMP.
+    rewrite <- H2 in H. 
+    simpls.
+    destruct n.
+    { unfolds in H. 
+      exists* H.
+      math. }
+    apply while_true_trace_rule in H.
+    exists r.
+    splits~.
+    rewrite <- TEMP0.
+    simpls.
+    unfold invalid_triple in *.
+    exists* H.
+    exists m I.
+    splits~.
+    exists m' n'.
+    splits~.
+    math.
+  - rewrite <- H2 in H.
+    unfold invalid_stmt in H.
+    assert (H3 : exists n', invalid_triple (CWhile b c) (P /\ ~ b)%A (P /\ ~ b)%A n') by (exists~ n).
+    rewrite invalid_triple_is_not_valid in H3.
+    contradict H3.
+    apply while_false_sound.
+Qed.
 
-
-
-
-
-Locate derives.  *)
+Lemma invalid_stmt_chain :
+  forall nd chain_len n,
+    invalid_stmt (rg.(rg_conc) nd) n ->
+    exists (p : path rg),
+      length (proj1_sig p) > chain_len /\
+      List.Forall (fun nd => invalid_stmt (rg.(rg_conc) nd) n) (proj1_sig p) /\
+      first (proj1_sig p) = Some nd.
+Proof.
+  induction chain_len.
+  intros.
+  exists (single_path nd).
+  split.
+  simpls.
+  rewrite length_cons. math.
+  simpls.
+  splits~.
+  intros.
+  specializes IHchain_len n H.
+  exists* IHchain_len.
+  assert (H0 : exists tl, (proj1_sig p) = nd :: tl).
+  destruct p.
+  simpls.
+  destruct x.
+  discriminate.
+  exists x.
+  injects~ IHchain_len1.
+  exists* H0.
+  pose proof last_exists tl nd.
+  apply none_not_some in H1.
+  exists* H1.
+  assert (H2 : invalid_stmt (rg_conc j) n). {
+    admit.
+  }
+  apply invalid_stmt_has_invalid_prem in H2.
+  exists* H2.
+  admit.
+Admitted.
 
 End InfiniteInvalid.
